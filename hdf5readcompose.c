@@ -18,7 +18,7 @@ void hdf5_read_dimensions_(int* m_nb, int*n_temp, int* o_y_q, int * n_qty_rd,int
     hid_t       datatype, dataspace;   /* handles */
     herr_t      status;
 
-    /* open existing file */    
+    /* open existing file */
     file = H5Fopen (file_name, H5F_ACC_RDONLY,H5P_DEFAULT);
 
     /* points for n_b */
@@ -31,7 +31,7 @@ void hdf5_read_dimensions_(int* m_nb, int*n_temp, int* o_y_q, int * n_qty_rd,int
      * Read the data from the dataset using default transfer properties.
      */
     status = H5Dread(dataset, H5T_NATIVE_INT, H5S_ALL, H5S_ALL, H5P_DEFAULT, m_nb);
-    
+
 /*      * Close/release resources.
      */
     H5Dclose(dataset);
@@ -107,10 +107,10 @@ void hdf5_read_(double * nb, double * t, double * y_q, double * quantity, int * 
 
 
 
-    /* open existing file */    
+    /* open existing file */
     file = H5Fopen (file_name, H5F_ACC_RDONLY,H5P_DEFAULT);
 
-    if(*openfile == 1) { 
+    if(*openfile == 1) {
 
     /* read points for density */
 
@@ -158,10 +158,10 @@ void hdf5_read_av_(double * nb, double * t, double * y_q, double * yav,double * 
     hid_t       datatype, dataspace;   /* handles */
     herr_t      status;
 
-    /* open existing file */    
+    /* open existing file */
     file = H5Fopen (file_name, H5F_ACC_RDONLY,H5P_DEFAULT);
 
-    if(*openfile == 1) { 
+    if(*openfile == 1) {
 
     /* read points for density */
 

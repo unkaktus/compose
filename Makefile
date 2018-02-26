@@ -23,7 +23,7 @@ EXEC = $(NAME)
 # default flag settings (BOUNDCHECK=0, HDF5 = 0)
 
 BOUNDCHECK = 0
-HDF5 = 0
+HDF5 = 1
 ifeq ($(BOUNDCHECK),1)
    FC_FLAGS_BOUNDCHECK = -fbounds-check
 endif
@@ -31,16 +31,21 @@ endif
 ifeq ($(HDF5),1)
    HDF5_LIB = -lhdf5
    HDF5_C = -Dhdf5
+   FC = h5pfc
+   CC = h5pcc
+   LINK = h5pfc
 else
    HDF5_LIB =
    HDF5_C =
+   FC = gfortran
+   CC = gcc
+   LINK = gfortran
 endif
-FC = gfortran
-FC_FLAGS = -c -g -pg -cpp -Wall -ffree-form $(FC_FLAGS_BOUNDCHECK)
-CC = gcc
+
+
+FC_FLAGS = -c -g -pg -cpp -Wall -ffree-form $(FC_FLAGS_BOUNDCHECK) $(HDF5_C)
 CC_FLAGS = -c -g -cpp
 
-LINK = gfortran
 LD_LIB = $(HDF5_LIB)
 
 

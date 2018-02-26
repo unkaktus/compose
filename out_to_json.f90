@@ -34,14 +34,14 @@ contains
   write(ifile,*) '  "info" : "The columns of the file eos.table contains the following quantities",'
   write(ifile,*) '  "columns" : {'
   i2 = i2+1
-  write(ifile,f1) '"',i2,'":{"title": "temperature T", "unit": "MeV" },'
+  write(ifile,f1) '"',i2,'":{"title": "temperature T", "unit": "MeV" ,"symbol":"T"},'
   i2 = i2+1
-  write(ifile,f1) '"',i2,'":{"title": "baryon number density n_b", "unit": "fm^-3"},'
+  write(ifile,f1) '"',i2,'":{"title": "baryon number density n_b", "unit": "fm^-3","symbol":"nb"},'
   i2 = i2+1
-  write(ifile,f1) '"',i2,'":{"title": "hadronic charge fraction Y_q", "unit":""},'
+  write(ifile,f1) '"',i2,'":{"title": "hadronic charge fraction Y_q", "unit":"","symbol":"Yq"},'
   if (irpl > 0) then
     i2 = i2+1
-    write(ifile,f1) '"',i2,'":{"title": "magnetic field strength B", "unit":"G"},'
+    write(ifile,f1) '"',i2,'":{"title": "magnetic field strength B", "unit":"G","symbol":"B"},'
   endif
   do i1=1,n_qty,1
     i2 = i2+1

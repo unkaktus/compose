@@ -1776,7 +1776,7 @@ if (ierr > 0) then
    end do
    write(*,*) 'program terminated'
    write(*,*)
-   stop
+   stop 2
 end if
 
 return
@@ -2413,7 +2413,7 @@ if (iwr == 1) then
       write(*,*) icnt(1),'entry/ies in eos.thermo missing'
    else
       write(*,*) ' no file eos.thermo'
-      stop
+      stop 2
    end if
    if (idx_ex(2) == 1) then
       write(*,*) icnt(2),'entry/ies in eos.compo missing'
