@@ -43,7 +43,7 @@ else
 endif
 
 
-FC_FLAGS = -c -g -pg -cpp -Wall -ffree-form $(FC_FLAGS_BOUNDCHECK) $(HDF5_C)
+FC_FLAGS = -c -g  -cpp -Wall -ffree-form $(FC_FLAGS_BOUNDCHECK) $(HDF5_C)
 CC_FLAGS = -c -g -cpp
 
 LD_LIB = $(HDF5_LIB)

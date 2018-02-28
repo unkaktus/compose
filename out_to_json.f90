@@ -17,10 +17,10 @@ module  m_out_to_json
 
 contains
 
- subroutine out_to_json_write(iwr,irpl,&
+ subroutine out_to_json_write(iwr,irpl,ibeta,&
    &                          idx_qty, idx_add, idx_df, idx_p, idx_q, idx_m, idx_err,&
    &                            n_qty,   n_add,    n_df,  n_p,   n_q,   n_m,   n_err)
-  integer, intent(in) :: iwr, n_qty, n_add, n_df, n_p, n_q, n_m, n_err, irpl
+  integer, intent(in) :: iwr, n_qty, n_add, n_df, n_p, n_q, n_m, n_err, irpl, ibeta
   integer, intent(in),dimension(:) :: idx_qty, idx_add, idx_df, idx_p, idx_q, idx_m, idx_err
   integer :: i1,i2,ifile = 10000
   character(11) :: f1 = '(a,i0,a)'
@@ -32,6 +32,11 @@ contains
   i2 = 0
   write(ifile,*) '{ '
   write(ifile,*) '  "info" : "The columns of the file eos.table contains the following quantities",'
+  if(ibeta==0)then
+    write(ifile,*) '  "beta_equi" : "true",'
+  else
+    write(ifile,*) '  "beta_equi" : "false",'
+  endif
   write(ifile,*) '  "columns" : {'
   i2 = i2+1
   write(ifile,f1) '"',i2,'":{"title": "temperature T", "unit": "MeV" ,"symbol":"T"},'

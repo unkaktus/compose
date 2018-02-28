@@ -3549,7 +3549,7 @@ if (itest == 0) then
                                    ' at n_b =',arg(2),' fm^-3 and Y_q =',arg(3)
                               i_entr = 1
                            else
-                              if (y > -1.d00) then
+                              !if (y > -1.d00) then
                                  ! no output if no solution of beta equilibrium
                                  if (iout == 1) then
                                     !ASCII
@@ -3616,7 +3616,7 @@ if (itest == 0) then
 
 #endif
                                  end if
-                              end if
+                              !end if
                            end if
                         end do
                      end do
@@ -3764,9 +3764,10 @@ if (iwr == 1) then
 end if
 
 ! write output on json file
-call out_to_json_write(iwr,irpl,&
+call out_to_json_write(iwr,irpl,i_beta, &
   &                    idx_qty, idx_add, idx_df, idx_p, idx_q, idx_m, idx_err,&
-  &                      n_qty,   n_add,    n_df,  n_p,   n_q,   n_m,   n_err)
+  &                    n_qty,   n_add,    n_df,  n_p,   n_q,   n_m,&
+  &                    n_err)
 
 
 if (allocated(tab_para)) deallocate(tab_para)
