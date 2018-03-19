@@ -3203,7 +3203,7 @@ SUBROUTINE get_eos_table(iwr)
 ! Stefan Typel for the CompOSE core team, version 1.19, 2017/12/13
 USE compose_internal
 USE m_out_to_json
-#if defined (hdf5)
+#if defined hdf5
 USE hdfparameters
 #endif
 
@@ -3212,6 +3212,7 @@ integer :: i,i_tny,i_beta,i_tab,ipl_t,ipl_n,ipl_y,itest,iwr,&
      i1,i2,i3,i4,i5,i6,i7,j_t,j_nb,j_yq,n_t,n_nb,n_yq,&
      i_t,i_nb,i_yq,i_entr,&
      j_b,n_b,i_b,ierr,iunit,ierror,iunit2,n_tnyb,ipl(3)
+integer :: flag_beta ! test (15/03/2018)
 double precision :: t_min,t_max,d_t,nb_min,nb_max,d_nb,&
      yq_min,yq_max,d_yq,b_min,b_max,d_b,t,n,y,b
 
@@ -3413,7 +3414,7 @@ if (itest == 0) then
               status='unknown',action='write',iostat=ierror)
       else
          ! HDF5
-#if defined (hdf5)
+#if defined hdf5
          IF(i_tab == 0) then
             call initialise_hdf5(n_tnyb,1,1,i_tab)
          else
@@ -3440,7 +3441,13 @@ if (itest == 0) then
                           ' at n_b =',arg2(2),' fm^-3 and Y_q =',arg2(3)
                      i_entr = 1
                   else
+! if no solution for beta equilibrium, still output with a flag (15/03/2018)
                      if (y > -1.d00) then
+                        flag_beta = 0
+                     else
+                        flag_beta = 1
+                     end if
+! end of test with output (15/03/2018)
                         ! no output if no solution of beta equilibrium
                         if (iout == 1) then
                            ! ASCII
@@ -3457,7 +3464,8 @@ if (itest == 0) then
                                    (eos_compo_p(i3),i3=1,n_p,1),&
                                    (eos_q(i4),i4=1,4*n_q,1),&
                                    (eos_micro(i5),i5=1,n_m,1),&
-                                   (eos_thermo_err(idx_err(i6)),i6=1,n_err,1)
+                                   (eos_thermo_err(idx_err(i6)),i6=1,n_err,1)&
+                                   ,flag_beta
                            else
                               write(iunit2,*) arg2(1),arg2(2),arg2(3),&
                                    (eos_thermo(idx_qty(i1)),i1=1,n_qty,1),&
@@ -3466,11 +3474,12 @@ if (itest == 0) then
                                    (eos_compo_p(i3),i3=1,n_p,1),&
                                    (eos_q(i4),i4=1,4*n_q,1),&
                                    (eos_micro(i5),i5=1,n_m,1),&
-                                   (eos_thermo_err(idx_err(i6)),i6=1,n_err,1)
+                                   (eos_thermo_err(idx_err(i6)),i6=1,n_err,1)&
+                                   ,flag_beta
                            end if
                         else
                            ! HDF5
-#if defined (hdf5)
+#if defined hdf5
                            t_hdf5(i_tny) = arg2(1)
                            nb_hdf5(i_tny) = arg2(2)
                            y_q_hdf5(i_tny) = arg2(3)
@@ -3505,7 +3514,7 @@ if (itest == 0) then
                            end IF
 #endif
                         end if
-                     end if
+!                     end if   (15/03/2018)
                   end if
                end do
             else
@@ -3538,7 +3547,7 @@ if (itest == 0) then
                            else
                               b = b_min*(d_b**(j_b-1))
                            end if
-#if defined (hdf5)
+#if defined hdf5
 ! magnetic field not yet implemented for HDF5 output
 #endif
                            !++++++++++++++++++++++++++++++++++++++
@@ -3549,7 +3558,13 @@ if (itest == 0) then
                                    ' at n_b =',arg(2),' fm^-3 and Y_q =',arg(3)
                               i_entr = 1
                            else
-                              !if (y > -1.d00) then
+! if no solution for beta equilibrium, still output with a flag (15/03/2018)
+                              if (y > -1.d00) then
+                                 flag_beta = 0
+                              else
+                                 flag_beta = 1
+                              end if
+! end of test with output (15/03/2018)
                                  ! no output if no solution of beta equilibrium
                                  if (iout == 1) then
                                     !ASCII
@@ -3566,7 +3581,8 @@ if (itest == 0) then
                                             (eos_compo_p(i3),i3=1,n_p,1),&
                                             (eos_q(i4),i4=1,4*n_q,1),&
                                             (eos_micro(i5),i5=1,n_m,1),&
-                                            (eos_thermo_err(idx_err(i6)),i6=1,n_err,1)
+                                            (eos_thermo_err(idx_err(i6)),i6=1,n_err,1)&
+                                            ,flag_beta
                                     else
                                        write(iunit2,*) arg2(1),arg2(2),arg2(3),&
                                             (eos_thermo(idx_qty(i1)),i1=1,n_qty,1),&
@@ -3575,11 +3591,12 @@ if (itest == 0) then
                                             (eos_compo_p(i3),i3=1,n_p,1),&
                                             (eos_q(i4),i4=1,4*n_q,1),&
                                             (eos_micro(i5),i5=1,n_m,1),&
-                                            (eos_thermo_err(idx_err(i6)),i6=1,n_err,1)
+                                            (eos_thermo_err(idx_err(i6)),i6=1,n_err,1)&
+                                       ,flag_beta
                                     endif
                                  else
                                     ! HDF5
-#if defined (hdf5)
+#if defined hdf5
                                     !2017/05/23
                                     t_hdf5(j_t) = arg2(1)
                                     nb_hdf5(j_nb) = arg2(2)
@@ -3616,7 +3633,7 @@ if (itest == 0) then
 
 #endif
                                  end if
-                              !end if
+!                              end if
                            end if
                         end do
                      end do
@@ -3631,7 +3648,7 @@ if (itest == 0) then
       close(unit=iunit2)
    else
       ! HDF5
-#if defined (hdf5)
+#if defined hdf5
       write(*,*)'call writing HDF5 table'
       call write_hdf5(i_tab)
       call close_hdf5
@@ -7410,7 +7427,7 @@ if (inew == 1) then
    end if
 
    iout = 1 ! Default is ASCII format
-#if defined (hdf5)
+#if defined hdf5
    write(*,*)
    write(*,*) ' Please select the format of the file eos.table from'
    write(6,*) ' 1: ASCII, else: HDF5'
