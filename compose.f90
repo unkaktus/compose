@@ -3212,7 +3212,7 @@ integer :: i,i_tny,i_beta,i_tab,ipl_t,ipl_n,ipl_y,itest,iwr,&
      i1,i2,i3,i4,i5,i6,i7,j_t,j_nb,j_yq,n_t,n_nb,n_yq,&
      i_t,i_nb,i_yq,i_entr,&
      j_b,n_b,i_b,ierr,iunit,ierror,iunit2,n_tnyb,ipl(3)
-integer :: flag_beta ! test (15/03/2018)
+
 double precision :: t_min,t_max,d_t,nb_min,nb_max,d_nb,&
      yq_min,yq_max,d_yq,b_min,b_max,d_b,t,n,y,b
 
@@ -3440,45 +3440,37 @@ if (itest == 0) then
                      write(*,*) ' no solution found for S =',t,&
                           ' at n_b =',arg2(2),' fm^-3 and Y_q =',arg2(3)
                      i_entr = 1
-                  else
-! if no solution for beta equilibrium, still output with a flag (15/03/2018)
-                     if (y > -1.d00) then
-                        flag_beta = 0
+                   else
+                     ! no output if no solution of beta equilibrium
+                     if (iout == 1) then
+                       ! ASCII
+                       do i=1,n_q,1
+                         eos_q(3*(i-1)+1) = eos_compo_q(i,1)
+                         eos_q(3*(i-1)+2) = eos_compo_q(i,2)
+                         eos_q(3*(i-1)+3) = eos_compo_q(i,3)
+                         eos_q(3*(i-1)+4) = eos_compo_q(i,4)
+                       end do
+                       if (irpl > 0) then
+                         write(iunit2,*) arg2(1),arg2(2),arg2(3),arg2(4),&
+                           (eos_thermo(idx_qty(i1)),i1=1,n_qty,1),&
+                           (eos_thermo_add(i2),i2=1,n_add,1),&
+                           (eos_compo_p(i3),i3=1,n_p,1),&
+                           (eos_q(i4),i4=1,4*n_q,1),&
+                           (eos_micro(i5),i5=1,n_m,1),&
+                           (eos_thermo_err(idx_err(i6)),i6=1,n_err,1)
+
+                       else
+                         write(iunit2,*) arg2(1),arg2(2),arg2(3),&
+                           (eos_thermo(idx_qty(i1)),i1=1,n_qty,1),&
+                           (eos_thermo_add(i2),i2=1,n_add,1),&
+                           (eos_df(idx_df(i7)),i7=1,n_df,1),&
+                           (eos_compo_p(i3),i3=1,n_p,1),&
+                           (eos_q(i4),i4=1,4*n_q,1),&
+                           (eos_micro(i5),i5=1,n_m,1),&
+                           (eos_thermo_err(idx_err(i6)),i6=1,n_err,1)
+                       end if
                      else
-                        flag_beta = 1
-                     end if
-! end of test with output (15/03/2018)
-                        ! no output if no solution of beta equilibrium
-                        if (iout == 1) then
-                           ! ASCII
-                           do i=1,n_q,1
-                              eos_q(3*(i-1)+1) = eos_compo_q(i,1)
-                              eos_q(3*(i-1)+2) = eos_compo_q(i,2)
-                              eos_q(3*(i-1)+3) = eos_compo_q(i,3)
-                              eos_q(3*(i-1)+4) = eos_compo_q(i,4)
-                           end do
-                           if (irpl > 0) then
-                              write(iunit2,*) arg2(1),arg2(2),arg2(3),arg2(4),&
-                                   (eos_thermo(idx_qty(i1)),i1=1,n_qty,1),&
-                                   (eos_thermo_add(i2),i2=1,n_add,1),&
-                                   (eos_compo_p(i3),i3=1,n_p,1),&
-                                   (eos_q(i4),i4=1,4*n_q,1),&
-                                   (eos_micro(i5),i5=1,n_m,1),&
-                                   (eos_thermo_err(idx_err(i6)),i6=1,n_err,1)&
-                                   ,flag_beta
-                           else
-                              write(iunit2,*) arg2(1),arg2(2),arg2(3),&
-                                   (eos_thermo(idx_qty(i1)),i1=1,n_qty,1),&
-                                   (eos_thermo_add(i2),i2=1,n_add,1),&
-                                   (eos_df(idx_df(i7)),i7=1,n_df,1),&
-                                   (eos_compo_p(i3),i3=1,n_p,1),&
-                                   (eos_q(i4),i4=1,4*n_q,1),&
-                                   (eos_micro(i5),i5=1,n_m,1),&
-                                   (eos_thermo_err(idx_err(i6)),i6=1,n_err,1)&
-                                   ,flag_beta
-                           end if
-                        else
-                           ! HDF5
+                          ! HDF5
 #if defined hdf5
                            t_hdf5(i_tny) = arg2(1)
                            nb_hdf5(i_tny) = arg2(2)
@@ -3558,13 +3550,6 @@ if (itest == 0) then
                                    ' at n_b =',arg(2),' fm^-3 and Y_q =',arg(3)
                               i_entr = 1
                            else
-! if no solution for beta equilibrium, still output with a flag (15/03/2018)
-                              if (y > -1.d00) then
-                                 flag_beta = 0
-                              else
-                                 flag_beta = 1
-                              end if
-! end of test with output (15/03/2018)
                                  ! no output if no solution of beta equilibrium
                                  if (iout == 1) then
                                     !ASCII
@@ -3581,8 +3566,7 @@ if (itest == 0) then
                                             (eos_compo_p(i3),i3=1,n_p,1),&
                                             (eos_q(i4),i4=1,4*n_q,1),&
                                             (eos_micro(i5),i5=1,n_m,1),&
-                                            (eos_thermo_err(idx_err(i6)),i6=1,n_err,1)&
-                                            ,flag_beta
+                                            (eos_thermo_err(idx_err(i6)),i6=1,n_err,1)
                                     else
                                        write(iunit2,*) arg2(1),arg2(2),arg2(3),&
                                             (eos_thermo(idx_qty(i1)),i1=1,n_qty,1),&
@@ -3591,8 +3575,7 @@ if (itest == 0) then
                                             (eos_compo_p(i3),i3=1,n_p,1),&
                                             (eos_q(i4),i4=1,4*n_q,1),&
                                             (eos_micro(i5),i5=1,n_m,1),&
-                                            (eos_thermo_err(idx_err(i6)),i6=1,n_err,1)&
-                                       ,flag_beta
+                                            (eos_thermo_err(idx_err(i6)),i6=1,n_err,1)
                                     endif
                                  else
                                     ! HDF5

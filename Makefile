@@ -23,7 +23,7 @@ EXEC = $(NAME)
 # default flag settings (BOUNDCHECK=0, HDF5 = 0)
 
 BOUNDCHECK = 0
-HDF5 = 1
+HDF5 = 0
 ifeq ($(BOUNDCHECK),1)
    FC_FLAGS_BOUNDCHECK = -fbounds-check
 endif
@@ -43,8 +43,8 @@ else
 endif
 
 
-FC_FLAGS = -c -g  -cpp -Wall -ffree-form $(FC_FLAGS_BOUNDCHECK) $(HDF5_C)
-CC_FLAGS = -c -g -cpp
+FC_FLAGS = -c -g -O3 -cpp -Wall -ffree-form $(FC_FLAGS_BOUNDCHECK) $(HDF5_C)
+CC_FLAGS = -c  -g -O3 -cpp
 
 LD_LIB = $(HDF5_LIB)
 
@@ -70,7 +70,7 @@ OBJ_F := $(SRC_F:.f90=.o)
 $(NAME):  $(OBJ_F) $(OBJ_C)
 	rm -f $(EXEC);
 	@echo building compose;
-	$(LINK) -pg -o $(EXEC) $(OBJ_F) $(OBJ_C) $(LD_LIB)
+	$(LINK) -g -O3 -o $(EXEC) $(OBJ_F) $(OBJ_C) $(LD_LIB)
 
 %.o: %.f90
 	$(FC) $(FC_FLAGS) $< -o $@
