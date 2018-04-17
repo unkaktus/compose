@@ -4288,8 +4288,7 @@ implicit none
 integer, parameter :: dim_igp=100
 integer :: m(3),inmp,ibeta,i1,i2,i3,i1p,i2p,i3p,iq,iq2,is,dim_ipl,&
      igp,ngp,igp3,ngp3,igp_r,igp3_r,j1,j2,j3,alloc_status,ierr,&
-     idx1(dim_igp),idx2(dim_igp),idx3(10),ir(-4:5),irp,ipl(3),ik(3),&
-     get_ipl_rule
+     idx1(dim_igp),idx2(dim_igp),idx3(10),ir(-4:5),irp,ipl(3),ik(3)
 double precision :: q(3),vec(-4:5),vec3(-4:5,3),tmp,dh(0:2)
 double precision, allocatable :: mat(:,:,:),mat3(:,:,:,:),&
      vp_compo(:),vq_compo(:,:),v_micro(:)
@@ -4834,8 +4833,7 @@ implicit none
 integer, parameter :: dim_igp=100
 integer :: m(3),inmp,ibeta,i1,i2,i3,i1p,i2p,i3p,iq,iq2,is,dim_ipl,&
      igp,ngp,igp3,ngp3,igp_r,igp3_r,j1,j2,j3,alloc_status,ierr,&
-     idx1(dim_igp),idx2(dim_igp),idx3(10),ir(-4:5),irp,ipl(3),ik(3),&
-     get_ipl_rule
+     idx1(dim_igp),idx2(dim_igp),idx3(10),ir(-4:5),irp,ipl(3),ik(3)
 double precision :: q(3),vec(-4:5),vec3(-4:5,3),&
      qx,qy,dg(0:2,0:2),tmp,dh(0:2)
 double precision, allocatable :: mat(:,:,:),mat2(:,:,:),mat3(:,:,:,:),&
@@ -4889,19 +4887,16 @@ call write_errors(ierr)
 !                  one-dimensional interpolation in ik(3)
 
 ! irpl == 0 or 3
-do i1=1,3,1
-   ik(i1) = i1
-end do
-if (irpl == 1) then
-   ik(1) = 2
-   ik(2) = 3
-   ik(3) = 1
-end if
-if (irpl == 2) then
-   ik(1) = 1
-   ik(2) = 3
-   ik(3) = 2
-end if
+select case(irpl)
+case(0)
+  ik = [ (i1,  i1 = 1,3, 1 )]
+case(1)
+  ik = [ 2, 3, 1]
+case(2)
+  ik = [ 1, 3, 2]
+case default
+  ik = [ (i1,  i1 = 1,3, 1 )]
+end select
 
 ! list of grid points and reference point in indices 1 and 2
 igp = 0
@@ -4985,17 +4980,16 @@ do iq=1,nall_max,1
                j1 = i3p
                j2 = i1p
                j3 = i2p
+            elseif (irpl == 2) then
+              j1 = i1p
+              j2 = i3p
+              j3 = i2p
             else
-               if (irpl == 2) then
-                  j1 = i1p
-                  j2 = i3p
-                  j3 = i2p
-               else
-                  j1 = i1p
-                  j2 = i2p
-                  j3 = i3p
-               end if
+              j1 = i1p
+              j2 = i2p
+              j3 = i3p
             end if
+
             vec(idx3(igp3)) = tab_thermo(j1,j2,j3,iq)
             irp = idx_arg(j1,j2,j3,ik(3))
             ir(idx3(igp3)) = get_ipl_rule(irp,idx3(igp3),ipl(ik(3)))
@@ -6318,8 +6312,7 @@ SUBROUTINE get_diff_rules2(m,ipl,ik)
 ! Stefan Typel for the CompOSE core team, version 1.07, 2016/10/28
 USE compose_internal
 implicit none
-integer :: m(3),i1,i2,ix,iy,ixp,iyp,i1p,i2p,iq,ir,irp,ipl(3),ik(3),&
-     get_ipl_rule
+integer :: m(3),i1,i2,ix,iy,ixp,iyp,i1p,i2p,iq,ir,irp,ipl(3),ik(3)
 
 
 d1x(-4:5,-4:5,-4:4) = 0.d00
@@ -6370,21 +6363,8 @@ dy2 = dy*dy
 
 return
 end SUBROUTINE get_diff_rules2
-!***********************************************************************
-INTEGER FUNCTION get_ipl_rule(ir,idx,ipl)
-! Stefan Typel for the CompOSE core team, version 0.02, 2016/06/20
-USE compose_internal
-implicit none
-integer :: ir,idx,ipl
 
-if (idx > 0) then
-   get_ipl_rule = ipl_rule(1,ipl,ir)
-else
-   get_ipl_rule = ipl_rule(0,ipl,ir)
-end if
 
-return
-end FUNCTION get_ipl_rule
 !***********************************************************************
 SUBROUTINE get_interpol_x(m,q,ir,f,dh,ipl,idx)
 ! Stefan Typel for the CompOSE core team, version 1.04, 2016/10/28
