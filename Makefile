@@ -25,7 +25,7 @@ EXEC = $(NAME)
 BOUNDCHECK = 0
 HDF5 = 0
 ifeq ($(BOUNDCHECK),1)
-   FC_FLAGS_BOUNDCHECK = -fbounds-check
+   FC_FLAGS_BOUNDCHECK = #-fbounds-check
 endif
 
 ifeq ($(HDF5),1)

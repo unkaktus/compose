@@ -4868,7 +4868,6 @@ subroutine eos_interpol_d3(m,q,ipl,inmp,ibeta,dim_ipl)
  qx = q(ik(1))
  qy = q(ik(2))
 
-
  !$OMP PARALLEL &
  !$OMP SHARED(nall_max,idx_thermo,ngp,ngp3,idx3,ir,mat,ik,mat2, &
  !$OMP qx,qy,v_thermo,eos_df)
@@ -5133,11 +5132,20 @@ subroutine eos_interpol_d3(m,q,ipl,inmp,ibeta,dim_ipl)
 
    if (idx_ex(2) == 1) then
 
-     ! pairs
-     if (np_max > 0) mat(1:np_max,-4:5,-4:5) = 0.d00
+     ! interpolation in index 1 and 2
+     qx = q(ik(1))
+     qy = q(ik(2))
 
      ! interpolation in index 3
+     !$OMP PARALLEL &
+     !$OMP DEFAULT(SHARED)
+
+     !$OMP DO &
+     !$OMP PRIVATE(iq,igp,i1p,i2p,vec,igp3,i3p,j1,j2,j3,irp,dh,dg)
      do iq=1,np_max,1
+
+       mat(iq,-4:5,-4:5) = 0.d00
+
        do igp=1,ngp,1
          i1p = idx1(igp)+m(ik(1))
          i2p = idx2(igp)+m(ik(2))
@@ -5171,31 +5179,28 @@ subroutine eos_interpol_d3(m,q,ipl,inmp,ibeta,dim_ipl)
          call get_interpol_x(m,q,ir,vec,dh,ipl,ik(3))
          mat(iq,idx1(igp),idx2(igp)) = dh(0)
        end do
-     end do
 
-     ! interpolation in index 1 and 2
-     qx = q(ik(1))
-     qy = q(ik(2))
-     do iq=1,np_max,1
-       df(0,0,-4:5,-4:5) = mat(iq,-4:5,-4:5)
-       call get_derivatives(ipl,ik)
-       call get_coefficients()
-       call get_interpol_xy(qx,qy,dg,0)
+
+       ! call get_derivatives(ipl,ik)
+       ! call get_coefficients()
+       ! call get_interpol_xy(qx,qy,dg,0)
+       call make_interp_xy(ipl,ik,qx,qy,dg,0,mat(iq,-4:5,-4:5))
+
        vp_compo(iq) = dg(0,0)
-     end do
 
-     do iq=1,np_max,1
        !         if (vp_compo(iq) > 0.d00) then
        eos_compo_p(iq) = vp_compo(iq)
        !         end if
        idx_compo_p(iq) = idx_p(iq)
-     end do
 
-     ! quadruples
-     if (nq_max > 0) then
-       mat(1:nq_max,-4:5,-4:5) = 0.d00
-       mat3(1:nq_max,-4:5,-4:5,1:3) = 0.d00
-     end if
+       ! quadruples
+       mat(iq,-4:5,-4:5) = 0.d00
+       mat3(iq,-4:5,-4:5,1:3) = 0.d00
+
+     end do
+     !$OMP END DO
+     !$OMP END PARALLEL
+
 
      ! interpolation in index 3
      !$OMP PARALLEL DO PRIVATE(vec3,iq,igp,i1p,i2p,vec,iq2)
@@ -5239,24 +5244,13 @@ subroutine eos_interpol_d3(m,q,ipl,inmp,ibeta,dim_ipl)
            mat3(iq,idx1(igp),idx2(igp),is) = dh(0)
          end do
        end do
-     end do
-     !$OMP END PARALLEL DO
 
-     ! interpolation in index 1 and 2
-     qx = q(ik(1))
-     qy = q(ik(2))
-     do iq=1,nq_max,1
+       ! interpolation in index 1 and 2
        do is=1,3,1
-         df(0,0,-4:5,-4:5) = mat3(iq,-4:5,-4:5,is)
-
-         call get_derivatives(ipl,ik)
-         call get_coefficients()
-         call get_interpol_xy(qx,qy,dg,0)
+         call make_interp_xy(ipl,ik,qx,qy,dg,1,mat3(iq,-4:5,-4:5,is))
          vq_compo(iq,is) = dg(0,0)
        end do
-     end do
 
-     do iq=1,nq_max,1
        if ((vq_compo(iq,3) > 0.d00).and.(vq_compo(iq,2) > 0.d00).and.&
          (vq_compo(iq,1) > 0.d00)) then
          eos_compo_q(iq,1) = vq_compo(iq,3)
@@ -5268,6 +5262,7 @@ subroutine eos_interpol_d3(m,q,ipl,inmp,ibeta,dim_ipl)
        end if
        idx_compo_q(iq) = idx_q(iq)
      end do
+     !$OMP END PARALLEL DO
    end if
 
    ! microscopic quantities
@@ -5276,10 +5271,14 @@ subroutine eos_interpol_d3(m,q,ipl,inmp,ibeta,dim_ipl)
 
    if (idx_ex(3) == 1) then
 
-     mat(1:nm_max,-4:5,-4:5) = 0.d00
+     qx = q(ik(1))
+     qy = q(ik(2))
 
      ! interpolation in index 3
+     !$OMP PARALLEL DO PRIVATE(vec3,iq,igp,i1p,i2p,i3p,vec,iq2,j1,j2,j3)
      do iq=1,nm_max,1
+       mat(iq,-4:5,-4:5) = 0.d00
+
        do igp=1,ngp,1
          i1p = idx1(igp)+m(ik(1))
          i2p = idx2(igp)+m(ik(2))
@@ -5288,21 +5287,20 @@ subroutine eos_interpol_d3(m,q,ipl,inmp,ibeta,dim_ipl)
          do igp3=1,ngp3,1
            i3p = idx3(igp3)+m(ik(3))
            vec(idx3(igp3)) = 0.d00
-           if (irpl == 1) then
+           select case(irpl)
+           case(1)
              j1 = i3p
              j2 = i1p
              j3 = i2p
-           else
-             if (irpl == 2) then
-               j1 = i1p
-               j2 = i3p
-               j3 = i2p
-             else
-               j1 = i1p
-               j2 = i2p
-               j3 = i3p
-             end if
-           end if
+           case(2)
+             j1 = i1p
+             j2 = i3p
+             j3 = i2p
+           case default
+             j1 = i1p
+             j2 = i2p
+             j3 = i3p
+           end select
            do iq2=1,nm_max,1
              if (idx_mic(j1,j2,j3,iq2) == idx_m(iq)) then
                vec(idx3(igp3)) = tab_mic(j1,j2,j3,iq2)
@@ -5314,36 +5312,19 @@ subroutine eos_interpol_d3(m,q,ipl,inmp,ibeta,dim_ipl)
          call get_interpol_x(m,q,ir,vec,dh,ipl,ik(3))
          mat(iq,idx1(igp),idx2(igp)) = dh(0)
        end do
-     end do
+     ! end do
 
      ! interpolation in index 1 and 2
-     qx = q(ik(1))
-     qy = q(ik(2))
-     do iq=1,nm_max,1
-       df(0,0,-4:5,-4:5) = mat(iq,-4:5,-4:5)
-       call get_derivatives(ipl,ik)
-       call get_coefficients()
-       call get_interpol_xy(qx,qy,dg,0)
+     ! do iq=1,nm_max,1
+       call make_interp_xy(ipl,ik,qx,qy,dg,0,mat(iq,-4:5,-4:5))
        v_micro(iq) = dg(0,0)
-     end do
-
-     do iq=1,nm_max,1
        eos_micro(iq) = v_micro(iq)
        idx_micro(iq) = idx_m(iq)
      end do
+     !$OMP END PARALLEL DO
    end if
 
  end if
-
-
-
-
- ! if (allocated(mat)) deallocate(mat)
- ! if (allocated(mat3)) deallocate(mat3)
- ! if (allocated(vp_compo)) deallocate(vp_compo)
- ! if (allocated(vq_compo)) deallocate(vq_compo)
- ! if (allocated(v_micro)) deallocate(v_micro)
-
 
 end SUBROUTINE eos_interpol_d3
 !***********************************************************************
@@ -6182,7 +6163,7 @@ end SUBROUTINE get_diff_rules2
 !***********************************************************************
 subroutine get_interpol_x(m,q,ir,f,dh,ipl,idx)
  ! Stefan Typel for the CompOSE core team, version 1.04, 2016/10/28
- USE compose_internal
+ use compose_internal,only : r1d, r2d, tab_para
  implicit none
  double precision,intent(in) :: q(3),f(-4:5)
  double precision,intent(out) :: dh(0:2)
