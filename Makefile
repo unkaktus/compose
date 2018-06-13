@@ -37,14 +37,14 @@ ifeq ($(HDF5),1)
 else
    HDF5_LIB =
    HDF5_C =
-   FC = ifort
-   CC = icc
-   LINK = ifort
+   FC = gfortran
+   CC = gcc
+   LINK = gfortran
 endif
 
 
-FC_FLAGS = -c -g -pg -O3 -cpp -Wall -ffree-form $(FC_FLAGS_BOUNDCHECK) $(HDF5_C)
-CC_FLAGS = -c  -g -pg -O3 -cpp
+FC_FLAGS = -g -O3 -cpp -pg -fopenmp #-Wall -ffree-form $(FC_FLAGS_BOUNDCHECK)#$(HDF5_C)
+CC_FLAGS = -g -O3 -cpp
 
 LD_LIB = $(HDF5_LIB)
 
@@ -70,14 +70,14 @@ OBJ_F := $(SRC_F:.f90=.o)
 $(NAME):  $(OBJ_F) $(OBJ_C)
 	rm -f $(EXEC);
 	@echo building compose;
-	$(LINK) -g -pg -O3 -o $(EXEC) $(OBJ_F) $(OBJ_C) $(LD_LIB)
+	$(LINK)  $(FC_FLAGS) -o $(EXEC) $(OBJ_F) $(OBJ_C) $(LD_LIB)
 
 %.o: %.f90
-	$(FC) $(FC_FLAGS) $< -o $@
+	$(FC) -c $(FC_FLAGS) $< -o $@
 
 
 %.o : %.c
-	$(CC) $(CC_FLAGS) $< -o $@
+	$(CC) -c $(CC_FLAGS) $< -o $@
 
 
 clean:

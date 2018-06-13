@@ -37,6 +37,7 @@ module eos_tables
  ! proton mass in MeV/c^{2}, standard value
  double precision :: m_p = 938.272046d00
 
+ real:: time0,time1
 END MODULE eos_tables
 
 
