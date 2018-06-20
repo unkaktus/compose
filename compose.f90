@@ -18,8 +18,10 @@ PROGRAM compose
 !***********************************************************************
 ! Stefan Typel for the CompOSE core team, version 1.09, 2017/09/28
 ! working with CompOSE EoS tables
-implicit none
-integer :: iwr,iterm
+
+ implicit none
+
+ integer :: iwr,iterm
 
 ! 1: terminal version for input,
 ! else: standard version with input from files
@@ -113,1412 +115,29 @@ end PROGRAM compose
 ! subroutines
 !***********************************************************************
 !***********************************************************************
-SUBROUTINE init_eos_table(iwr)
+subroutine init_eos_table(iwr)
 ! Stefan Typel for the CompOSE core team, version 1.06, 2017/11/16
-implicit none
-integer :: nbl,iwr,iyq
+ use omp_lib
+ use m_get_tables
+ implicit none
+ integer :: nbl,iwr,iyq
 
 ! maximum number of subtables
-nbl = 10
+ nbl = 10
 
-call read_eos_tables_tnyb(iwr,0,0,0,iyq)
 
-call read_eos_table_thermo(iwr,nbl,0,0,iyq)
+ call read_eos_4_tables(iwr,nbl,iyq,ii_thermo=0,ii_tynb=0,unit=0,iinit=0)
 
-call read_eos_table_compo(iwr,nbl,0,0)
+ call get_diff_rules()
 
-call read_eos_table_micro(iwr,nbl,0,0)
+ call init_ipl_rule()
 
-call get_diff_rules()
+ call get_eos_report(iwr)
 
-call init_ipl_rule()
-
-call get_eos_report(iwr)
-
-return
 end SUBROUTINE init_eos_table
-!***********************************************************************
-SUBROUTINE read_eos_tables_tnyb(iwr,ii,iunit2,iinit,iyq)
-! Stefan Typel for the CompOSE core team, version 2.05, 2017/11/16
-USE compose_internal
-implicit none
-integer :: iwr,ii,iunit2,iinit,iyq
-integer :: it,in,iy,ib,ip,ipp,ippp,iunit,ierror,ierr,ipar
-integer :: alloc_status,itmp(4),itmpp(4),icnt(4),ivar(4)
-double precision :: tmp
 
-! counter for total number of read table entries
-icnt(1:4) = 0
-ivar(1:4) = 0
 
-! error counter
-ierr = 0
 
-! maximum dimension of parameter vector
-dim_a = 0
-
-! temperature
-ip = 1
-iunit = 20+ip
-open(unit=iunit,file='eos.t',&
-     status='old',action='read',iostat=ierror)
-if (ierror == 0) then
-   if (iwr == 1) then
-      write(*,*)
-      write(*,*) ' reading minimum and maximum index ',&
-           'from parameter table for temperature T'
-   end if
-   read(iunit,*) itmp(ip)
-   read(iunit,*) itmpp(ip)
-   if (itmpp(ip) < itmp(ip)) then
-      ierr = ierr+1
-      if (ierr < dim_err) error_msg(ierr) = 3
-   end if
-   if (itmpp(ip) > itmp(ip)) ivar(ip) = 1
-else
-   ierr = ierr+1
-   if (ierr < dim_err) error_msg(ierr) = 1
-end if
-close(unit=iunit)
-
-! baryon number density
-ip = 2
-iunit = 20+ip
-open(unit=iunit,file='eos.nb',&
-     status='old',action='read',iostat=ierror)
-if (ierror == 0) then
-   if (iwr == 1) then
-      write(*,*)
-      write(*,*) ' reading minimum and maximum index ',&
-           'from parameter table for baryon number density n_b'
-   end if
-   read(iunit,*) itmp(ip)
-   read(iunit,*) itmpp(ip)
-   if (itmpp(ip) < itmp(ip)) then
-      ierr = ierr+1
-      if (ierr < dim_err) error_msg(ierr) = 8
-   end if
-   if (itmpp(ip) > itmp(ip)) ivar(ip) = 1
-else
-   ierr = ierr+1
-   error_msg(ierr) = 6
-end if
-close(unit=iunit)
-
-! hadronic charge fraction
-iyq = 0
-ip = 3
-iunit = 20+ip
-open(unit=iunit,file='eos.yq',&
-     status='old',action='read',iostat=ierror)
-if (ierror == 0) then
-   if (iwr == 1) then
-      write(*,*)
-      write(*,*) ' reading minimum and maximum index ',&
-           'from parameter table for hadronic charge fraction Y_q'
-   end if
-   read(iunit,*) itmp(ip)
-   read(iunit,*) itmpp(ip)
-   if (itmpp(ip) < itmp(ip)) then
-      ierr = ierr+1
-      if (ierr < dim_err) error_msg(ierr) = 13
-   end if
-   if (itmpp(ip) > itmp(ip)) then
-      ivar(ip) = 1
-      iyq = 1
-   end if
-else
-   ierr = ierr+1
-   if (ierr < dim_err) error_msg(ierr) = 11
-end if
-close(unit=iunit)
-
-! magnetic field strength
-ip = 4
-iunit = 20+ip
-open(unit=iunit,file='eos.b',&
-     status='old',action='read',iostat=ierror)
-if (ierror == 0) then
-   if (iwr == 1) then
-      write(*,*)
-      write(*,*) ' reading minimum and maximum index ',&
-           'from parameter table for magnetic field strength B'
-      write(*,*)
-   end if
-   read(iunit,*) itmp(ip)
-   read(iunit,*) itmpp(ip)
-   if (itmpp(ip) < itmp(ip)) then
-      ierr = ierr+1
-      if (ierr < dim_err) error_msg(ierr) = 18
-   end if
-   if (itmpp(ip) > itmp(ip)) ivar(ip) = 1
-else
-   itmp(ip) = 0
-   itmpp(ip) = 0
-   write(*,*)
-   write(*,*) ' no file eos.b'
-end if
-close(unit=iunit)
-
-if (ivar(4) == 1) then
-   if ((ivar(1)+ivar(2)+ivar(3)) == 3) then
-      ierr = ierr+1
-      if (ierr < dim_err) error_msg(ierr) = 15
-   else
-      if (ivar(1) == 0) then
-         irpl = 1
-         write(*,*) ' no dependence on temperature T'
-      endif
-      if (ivar(2) == 0) then
-         irpl = 2
-         write(*,*) ' no dependence on baryon density n_b'
-      endif
-      if (ivar(3) == 0) then
-         irpl = 3
-         write(*,*) ' no dependence on hadronic charge fraction Y_q'
-      endif
-      write(*,*) ' dependence on magnetic field strength B'
-   end if
-else
-   irpl = 0
-end if
-
-if ((irpl < 0).or.(irpl > 3)) then
-   ierr = ierr+1
-   if (ierr < dim_err) error_msg(ierr) = 5
-end if
-
-ipar = 0
-do ip=1,4,1
-! dimension of parameter vectors
-   dim_p(ip) = itmpp(ip)-itmp(ip)+1
-   if (dim_p(ip) > dim_a) then
-      dim_a = dim_p(ip)
-   end if
-   if (dim_p(ip) == 1) ipar = ipar+1
-end do
-if (ipar == 0) then
-! no dependence on any parameter
-   ierr = ierr+1
-   if (ierr < dim_err) error_msg(ierr) = 19
-end if
-
-call write_errors(ierr)
-
-! standard index ordering: T, n_b, Y_q
-do ip=1,3,1
-   imap(ip) = ip
-   jmap(ip) = ip
-end do
-jmap(4) = 0
-inbyq = 1
-
-if (irpl == 1) then
-! index ordering: B, n_b, Y_q
-   imap(1) = 4
-   imap(2) = 2
-   imap(3) = 3
-   jmap(1) = 0
-   jmap(2) = 2
-   jmap(3) = 3
-   jmap(4) = 1
-   inbyq = 1
-endif
-if (irpl == 2) then
-! index ordering: T, B, Y_q
-   imap(1) = 1
-   imap(2) = 4
-   imap(3) = 3
-   jmap(1) = 1
-   jmap(2) = 0
-   jmap(3) = 3
-   jmap(4) = 2
-   inbyq = 0
-endif
-if (irpl == 3) then
-! index ordering: T, n_b, B
-   imap(1) = 1
-   imap(2) = 2
-   imap(3) = 4
-   jmap(1) = 1
-   jmap(2) = 2
-   jmap(3) = 0
-   jmap(4) = 3
-   inbyq = 0
-endif
-! mapping of indices
-do ip=1,3,1
-   dim_idx(ip) = dim_p(imap(ip))
-end do
-if (inbyq == 1) then
-   if ((dim_idx(2) < 2).or.(dim_idx(3) < 2)) inbyq = 0
-end if
-
-! allocation of arrays
-if (iinit == 0) then
-   allocate(tab_para(dim_a,1:8),stat=alloc_status)
-   if (alloc_status /= 0) then
-      ierr = ierr+1
-      if (ierr < dim_err) error_msg(ierr) = 28
-   end if
-
-   allocate(idx_arg(1:dim_idx(1),1:dim_idx(2),1:dim_idx(3),0:4),stat=alloc_status)
-   if (alloc_status /= 0) then
-      ierr = ierr+1
-      if (ierr < dim_err) error_msg(ierr) = 113
-   end if
-end if
-
-call write_errors(ierr)
-ierr = 0
-
-! initialization
-if (dim_a > 0) tab_para(1:dim_a,1:8) = 0.d00
-if ((dim_idx(1) > 0).and.(dim_idx(2) > 0).and.(dim_idx(3) > 0)) then
-   idx_arg(1:dim_idx(1),1:dim_idx(2),1:dim_idx(3),0:3) = 0
-   idx_arg(1:dim_idx(1),1:dim_idx(2),1:dim_idx(3),4) = -1
-end if
-
-! temperature
-ip = 1
-iunit = 20+ip
-open(unit=iunit,file='eos.t',&
-     status='old',action='read',iostat=ierror)
-if (ierror == 0) then
-   read(iunit,*) itmp(ip)
-   read(iunit,*) itmpp(ip)
-   do it=1,dim_p(ip),1
-      read(iunit,*) tmp
-      tab_para(it,ip) = tmp
-      icnt(ip) = icnt(ip)+1
-   end do
-   do it=2,dim_p(ip),1
-      if ((ierr == 0).and.(tab_para(it,ip) < tab_para(it-1,ip))) then
-         ierr = ierr+1
-         if (ierr < dim_err) error_msg(ierr) = 2
-      end if
-   end do
-   if (ierr == 0) then
-      min_idx(ip) = itmp(ip)
-   end if
-end if
-close(unit=iunit)
-if (iwr == 1) then
-   write(*,*)
-   write(*,*) icnt(ip),&
-        'entries of parameter table for temperatures read'
-end if
-ipp = ip+4
-do it=1,(dim_p(ip)-1),1
-   tab_para(it,ipp) = tab_para(it+1,ip)-tab_para(it,ip)
-end do
-
-! baryon number density
-ip = 2
-iunit = 20+ip
-open(unit=iunit,file='eos.nb',&
-     status='old',action='read',iostat=ierror)
-if (ierror == 0) then
-   read(iunit,*) itmp(ip)
-   read(iunit,*) itmpp(ip)
-   do in=1,dim_p(ip),1
-      read(iunit,*) tmp
-      tab_para(in,ip) = tmp
-      icnt(ip) = icnt(ip)+1
-   end do
-   do in=2,dim_p(ip),1
-      if ((ierr == 0).and.(tab_para(in,ip) < tab_para(in-1,ip))) then
-         ierr = ierr+1
-         if (ierr < dim_err) error_msg(ierr) = 7
-      end if
-   end do
-   if (ierr == 0) then
-      min_idx(ip) = itmp(ip)
-   end if
-end if
-close(unit=iunit)
-if (iwr == 1) then
-   write(*,*) icnt(ip),&
-        'entries of parameter table for baryon number densities read'
-end if
-ipp = ip+4
-do in=1,(dim_p(ip)-1),1
-   tab_para(in,ipp) = tab_para(in+1,ip)-tab_para(in,ip)
-end do
-
-! hadronic charge fraction
-ip = 3
-iunit = 20+ip
-open(unit=iunit,file='eos.yq',&
-     status='old',action='read',iostat=ierror)
-if (ierror == 0) then
-   read(iunit,*) itmp(ip)
-   read(iunit,*) itmpp(ip)
-   do iy=1,dim_p(ip),1
-      read(iunit,*) tmp
-      tab_para(iy,ip) = tmp
-      icnt(ip) = icnt(ip)+1
-   end do
-   do iy=2,dim_p(ip),1
-      if ((ierr == 0).and.(tab_para(iy,ip) < tab_para(iy-1,ip))) then
-         ierr = ierr+1
-         if (ierr < dim_err) error_msg(ierr) = 12
-      end if
-   end do
-   if (ierr == 0) then
-      min_idx(ip) = itmp(ip)
-   end if
-end if
-close(unit=iunit)
-if (iwr == 1) then
-   write(*,*) icnt(ip),&
-        'entries of parameter table for charge fraction read'
-end if
-ipp = ip+4
-do iy=1,(dim_p(ip)-1),1
-   tab_para(iy,ipp) = tab_para(iy+1,ip)-tab_para(iy,ip)
-end do
-
-! magnetic field strength
-ip = 4
-iunit = 20+ip
-open(unit=iunit,file='eos.b',&
-     status='old',action='read',iostat=ierror)
-if (ierror == 0) then
-   read(iunit,*) itmp(ip)
-   read(iunit,*) itmpp(ip)
-   do ib=1,dim_p(ip),1
-      read(iunit,*) tmp
-      tab_para(ib,ip) = tmp
-      icnt(ip) = icnt(ip)+1
-   end do
-   do ib=2,dim_p(ip),1
-      if ((ierr == 0).and.(tab_para(ib,ip) < tab_para(ib-1,ip))) then
-         ierr = ierr+1
-         if (ierr < dim_err) error_msg(ierr) = 17
-      end if
-   end do
-   if (ierr == 0) then
-      min_idx(ip) = itmp(ip)
-!      idx_min(ip) = itmp(ip)
-!      idx_max(ip) = itmpp(ip)
-   end if
-   if (iwr == 1) then
-      write(*,*) icnt(ip),&
-      'entries of parameter table for magnetic field strength read'
-   end if
-   ipp = ip+4
-   do ib=1,(dim_p(ip)-1),1
-      tab_para(ib,ipp) = tab_para(ib+1,ip)-tab_para(ib,ip)
-   end do
-else
-   icnt(ip) = 1
-   min_idx(ip) = 1
-end if
-close(unit=iunit)
-
-! consistency of dimensions
-do ip=1,4,1
-   if (icnt(ip) /= dim_p(ip)) then
-      ierr = ierr+1
-      if (ierr < dim_err) error_msg(ierr) = 119+ip
-   end if
-end do
-
-call write_errors(ierr)
-
-if (iwr == 1) then
-   write(*,*)
-   write(*,*) ' maximum dimension of parameter files =',dim_a
-end if
-
-! minimum and maximum values
-do ip=1,3,1
-   para_min(ip) = tab_para(1,ip)
-   para_max(ip) = tab_para(dim_p(ip),ip)
-end do
-ip = 4
-if (irpl > 0) then
-   para_min(ip) = tab_para(1,ip)
-   para_max(ip) = tab_para(dim_p(ip),ip)
-else
-   para_min(ip) = 0.d00
-   para_max(ip) = 0.d00
-end if
-
-if (iwr == 1) then
-   if (ivar(1) == 1) then
-      write(*,*)
-      write(*,*) ' minimum temperature:',para_min(1),'MeV'
-      write(*,*) ' maximum temperature:',para_max(1),'MeV'
-   end if
-   if (ivar(2) == 1) then
-      write(*,*)
-      write(*,*) ' minimum baryon number density:',para_min(2),'fm^-3'
-      write(*,*) ' maximum baryon number density:',para_max(2),'fm^-3'
-   end if
-   if (ivar(3) == 1) then
-      write(*,*)
-      write(*,*) ' minimum hadronic charge fraction:',para_min(3)
-      write(*,*) ' maximum hadronic charge fraction:',para_max(3)
-   end if
-   if (ivar(4) == 1) then
-      write(*,*)
-      write(*,*) ' minimum magnetic field strength:',para_min(4),'G'
-      write(*,*) ' maximum magnetic field strength:',para_max(4),'G'
-   end if
-end if
-
-! mapping of parameter values, save value of constant parameter
-if (irpl == 0) then
-   val_rpl = tab_para(1,4)
-else
-   val_rpl = tab_para(1,irpl)
-   do ip=1,3,1
-      ipp = ip+4
-      ippp = imap(ip)+4
-      do ib=1,dim_p(4),1
-         tab_para(ib,ip) = tab_para(ib,imap(ip))
-         tab_para(ib,ipp) = tab_para(ib,ippp)
-      end do
-   end do
-end if
-
-if (ii == 1) then
-   write(iunit2,*) (ivar(in),in=1,4,1),irpl
-   do ip=1,4,1
-      write(iunit2,*) para_min(ip),para_max(ip)
-   end do
-end if
-
-return
-end SUBROUTINE read_eos_tables_tnyb
-!***********************************************************************
-SUBROUTINE read_eos_table_thermo(iwr,nbl,ii,iunit2,iyq)
-! Stefan Typel for the CompOSE core team, version 2.04, 2017/11/16
-USE compose_internal
-implicit none
-integer :: iwr,nbl,ii,iunit2,iyq
-integer :: ibl,ierror,icnt,it,in,iy,it2,in2,iy2,alloc_status,&
-     iv,iunit,iflag,itmp,nqty,iw,ierr,ibeta
-double precision :: tmp(dim_reg)
-double precision, allocatable :: qty(:)
-
-! indices and stored quantities in tab_thermo
-! 1: p/n_b
-! 2: s/n_b
-! 3: mu_b/m_n-1
-! 4: mu_q/m_n
-! 5: mu_e/m_n
-! 6: f/(n_b*m_n)-1
-! 7: e/(n_b_m_n)-1
-
-! counter for total number of read table entries
-icnt = 0
-
-! error counter
-ierr = 0
-
-idx_ex(1) = 0
-if (ii /= 2) then
-   open(unit=20,file='eos.thermo',&
-   status='old',action='read',iostat=ierror)
-   if (ierror == 0) then
-      itmp = 0
-   else
-      itmp = nbl-1
-   end if
-
-   do ibl=0,itmp,1
-      ! flag for stop reading file
-      iflag = 0
-      iunit = 20+ibl
-
-      choose_file_0: select case (ibl)
-      case (0)
-         if (itmp > 0) then
-            open(unit=iunit,file='eos.thermo0',&
-            status='old',action='read',iostat=ierror)
-         end if
-      case (1)
-         open(unit=iunit,file='eos.thermo1',&
-         status='old',action='read',iostat=ierror)
-      case (2)
-         open(unit=iunit,file='eos.thermo2',&
-         status='old',action='read',iostat=ierror)
-      case (3)
-         open(unit=iunit,file='eos.thermo3',&
-         status='old',action='read',iostat=ierror)
-      case (4)
-         open(unit=iunit,file='eos.thermo4',&
-         status='old',action='read',iostat=ierror)
-      case (5)
-         open(unit=iunit,file='eos.thermo5',&
-         status='old',action='read',iostat=ierror)
-      case (6)
-         open(unit=iunit,file='eos.thermo6',&
-         status='old',action='read',iostat=ierror)
-      case (7)
-         open(unit=iunit,file='eos.thermo7',&
-         status='old',action='read',iostat=ierror)
-      case (8)
-         open(unit=iunit,file='eos.thermo8',&
-         status='old',action='read',iostat=ierror)
-      case (9)
-         open(unit=iunit,file='eos.thermo9',&
-         status='old',action='read',iostat=ierror)
-      end select choose_file_0
-
-      nadd_max = 0
-      if (ierror == 0) then
-         idx_ex(1) = 1
-         if (iwr == 1) then
-            write(*,*)
-            write(*,*) ' reading eos table(s) with thermodynamic properties'
-         end if
-         read(iunit,*,iostat=ierror) m_n,m_p,incl_l
-         if ((ierror /= 0).or.(m_n < 0.d00).or.(m_p < 0.d00)) then
-            iflag = 1
-            ierr = ierr+1
-            if (ierr < dim_err) error_msg(ierr) = 27
-         end if
-         do while (iflag == 0)
-            read(iunit,*,iostat=ierror) it,in,iy,(tmp(iv),iv=1,dim_reg,1),&
-            nqty
-            if (ierror /= 0) then
-               iflag = 1
-            else
-               if (nqty < 0) then
-                  iflag = 1
-                  ierr = ierr+1
-                  if (ierr < dim_err) error_msg(ierr) = 21
-               end if
-               if (nqty > nadd_max) nadd_max = nqty
-               icnt = icnt+1
-            end if
-         end do
-      end if
-
-      close(unit=iunit)
-   end do
-   if (iwr == 1) then
-      write(*,*)
-      write(*,*) ' maximum number of additional quantities in eos.thermo =',nadd_max
-   end if
-
-   ! number of stored quantities in eos.thermo
-   nall_max = dim_reg+nadd_max
-end if
-
-if (ii /= 1) then
-   allocate(tab_thermo(1:dim_idx(1),1:dim_idx(2),1:dim_idx(3),1:nall_max),stat=alloc_status)
-   if (alloc_status /= 0) then
-      ierr = ierr+1
-      if (ierr < dim_err) error_msg(ierr) = 21
-   end if
-   allocate(idx_thermo(1:nall_max),stat=alloc_status)
-   if (alloc_status /= 0) then
-      ierr = ierr+1
-      if (ierr < dim_err) error_msg(ierr) = 34
-   end if
-   allocate(v_thermo(1:nall_max,0:4),stat=alloc_status)
-   if (alloc_status /= 0) then
-      ierr = ierr+1
-      if (ierr < dim_err) error_msg(ierr) = 35
-   end if
-   if (nadd_max < 2) then
-      allocate(eos_thermo_add(1:2),stat=alloc_status)
-   else
-      allocate(eos_thermo_add(1:nadd_max),stat=alloc_status)
-   end if
-   if (alloc_status /= 0) then
-      ierr = ierr+1
-      if (ierr < dim_err) error_msg(ierr) = 36
-   end if
-   allocate(idx_add(1:nadd_max),stat=alloc_status)
-   if (alloc_status /= 0) then
-      ierr = ierr+1
-      if (ierr < dim_err) error_msg(ierr) = 37
-   end if
-   allocate(qty(1:nadd_max),stat=alloc_status)
-   if (alloc_status /= 0) then
-      ierr = ierr+1
-      if (ierr < dim_err) error_msg(ierr) = 38
-   end if
-
-! initialization
-   if ((dim_idx(1) > 0).and.(dim_idx(2) > 0).and.(dim_idx(3) > 0).and.(nall_max > 0)) then
-      tab_thermo(1:dim_idx(1),1:dim_idx(2),1:dim_idx(3),1:nall_max) = 0.d00
-   end if
-
-   call write_errors(ierr)
-
-   icnt = 0
-   open(unit=20,file='eos.thermo',&
-   status='old',action='read',iostat=ierror)
-   if (ierror == 0) then
-      itmp = 0
-   else
-      itmp = nbl-1
-   end if
-
-   do ibl=0,itmp,1
-      ! flag for stop reading file
-      iflag = 0
-      iunit = 20+ibl
-
-      choose_file: select case (ibl)
-      case (0)
-         if (itmp > 0) then
-            open(unit=iunit,file='eos.thermo0',&
-            status='old',action='read',iostat=ierror)
-         end if
-      case (1)
-         open(unit=iunit,file='eos.thermo1',&
-         status='old',action='read',iostat=ierror)
-      case (2)
-         open(unit=iunit,file='eos.thermo2',&
-         status='old',action='read',iostat=ierror)
-      case (3)
-         open(unit=iunit,file='eos.thermo3',&
-         status='old',action='read',iostat=ierror)
-      case (4)
-         open(unit=iunit,file='eos.thermo4',&
-         status='old',action='read',iostat=ierror)
-      case (5)
-         open(unit=iunit,file='eos.thermo5',&
-         status='old',action='read',iostat=ierror)
-      case (6)
-         open(unit=iunit,file='eos.thermo6',&
-         status='old',action='read',iostat=ierror)
-      case (7)
-         open(unit=iunit,file='eos.thermo7',&
-         status='old',action='read',iostat=ierror)
-      case (8)
-         open(unit=iunit,file='eos.thermo8',&
-         status='old',action='read',iostat=ierror)
-      case (9)
-         open(unit=iunit,file='eos.thermo9',&
-         status='old',action='read',iostat=ierror)
-      end select choose_file
-
-      if (ierror == 0) then
-         idx_ex(1) = 1
-         read(iunit,*,iostat=ierror) m_n,m_p,incl_l
-         do while (iflag == 0)
-            read(iunit,*,iostat=ierror) it,in,iy,(tmp(iv),iv=1,dim_reg,1),&
-            nqty,(qty(iw),iw=1,nqty,1)
-            if (ierror /= 0) then
-               iflag = 1
-            else
-               it2 = it-min_idx(imap(1))+1
-               in2 = in-min_idx(imap(2))+1
-               iy2 = iy-min_idx(imap(3))+1
-               idx_arg(it2,in2,iy2,1) = 1
-               do iv=1,dim_reg,1
-                  tab_thermo(it2,in2,iy2,iv) = tmp(iv)
-               end do
-               do iw=1,nqty,1
-                  tab_thermo(it2,in2,iy2,dim_reg+iw) = qty(iw)
-               end do
-               icnt = icnt+1
-            end if
-         end do
-      end if
-
-      close(unit=iunit)
-   end do
-
-   if (allocated(qty)) deallocate(qty)
-end if
-
-call write_errors(ierr)
-
-if (incl_l /= 1) then
-   ibeta = 0
-else
-   ibeta = iyq
-end if
-
-if (ii == 1) then
-   write(iunit2,*) incl_l,nadd_max,nall_max,ibeta
-end if
-
-if (iwr == 1) then
-   write(*,*)
-   write(*,*) icnt,'entries of thermodynamic table read'
-end if
-
-
-return
-end SUBROUTINE read_eos_table_thermo
-!***********************************************************************
-SUBROUTINE read_eos_table_compo(iwr,nbl,ii,iunit2)
-! Stefan Typel for the CompOSE core team, version 2.04, 2016/11/08
-USE compose_internal
-implicit none
-integer :: iwr,nbl,ii,iunit2
-integer :: ibl,ierror,icnt,it,in,iy,it2,in2,iy2,&
-     iphase,iunit,iflag,itmp,ierr,ic,ic_min,ic_max,&
-     iv,iw,np,nq,alloc_status,idum0(dim_ip),idum1(dim_iq),&
-     idxp(dim_ip),idxq(dim_iq),ip,iq,jflag
-integer, allocatable :: iqtyp(:),iqtyq(:)
-double precision :: dum0,dum1,dum2,dum3
-double precision, allocatable :: qtyp(:),qtyq(:,:)
-
-! counter for total number of read table entries
-icnt = 0
-
-! error counter
-ierr = 0
-
-!if (ii /= 2) then
-!   np_max = 0
-!   nq_max = 0
-!end if
-
-if (dim_ip > 0) idxp(1:dim_ip) = -1
-
-if (dim_iq > 0) idxq(1:dim_iq) = -1
-
-! reading cycles
-idx_ex(2) = 0
-ic_min = 1
-ic_max = 2
-if (ii == 1) then
-   ic_max = 1
-end if
-if (ii == 2) then
-   ic_min = 2
-end if
-do ic=ic_min,ic_max,1
-   if (ic == 1) then
-      np_max = 0
-      nq_max = 0
-   end if
-   open(unit=20,file='eos.compo',&
-        status='old',action='read',iostat=ierror)
-   if (ierror == 0) then
-      itmp = 0
-   else
-      itmp = nbl-1
-   end if
-
-   do ibl=0,itmp,1
-      ! flag for stop reading file
-      iflag = 0
-      iunit = 20+ibl
-
-      choose_file: select case (ibl)
-      case (0)
-         if (itmp > 0) then
-            open(unit=iunit,file='eos.compo0',&
-                 status='old',action='read',iostat=ierror)
-         end if
-      case (1)
-         open(unit=iunit,file='eos.compo1',&
-              status='old',action='read',iostat=ierror)
-      case (2)
-         open(unit=iunit,file='eos.compo2',&
-              status='old',action='read',iostat=ierror)
-      case (3)
-         open(unit=iunit,file='eos.compo3',&
-              status='old',action='read',iostat=ierror)
-      case (4)
-         open(unit=iunit,file='eos.compo4',&
-              status='old',action='read',iostat=ierror)
-      case (5)
-         open(unit=iunit,file='eos.compo5',&
-              status='old',action='read',iostat=ierror)
-      case (6)
-         open(unit=iunit,file='eos.compo6',&
-              status='old',action='read',iostat=ierror)
-      case (7)
-         open(unit=iunit,file='eos.compo7',&
-              status='old',action='read',iostat=ierror)
-      case (8)
-         open(unit=iunit,file='eos.compo8',&
-              status='old',action='read',iostat=ierror)
-      case (9)
-         open(unit=iunit,file='eos.compo9',&
-              status='old',action='read',iostat=ierror)
-      end select choose_file
-
-      if (ierror == 0) then
-         idx_ex(2) = 1
-         if (ic == 1) then
-            if (iwr == 1) then
-               write(*,*)
-               write(*,*) ' reading eos table(s) with composition'
-            end if
-            do while (iflag == 0)
-               read(iunit,*,iostat=ierror) it,in,iy,iphase,&
-               np,(idum0(iv),dum0,iv=1,np,1),&
-               nq,(idum1(iw),dum1,dum2,dum3,iw=1,nq,1)
-               if (ierror /= 0) then
-                  iflag = 1
-               else
-                  icnt = icnt+1
-                  do ip=1,np,1
-                     jflag = 0
-                     do iq=1,np_max,1
-                        if (idum0(ip) == idxp(iq)) then
-                           jflag = 1
-                        end if
-                     end do
-                     if (jflag == 0) then
-                        np_max = np_max+1
-                        if (np_max > dim_ip) then
-                           ierr = ierr + 1
-                           if (ierr < dim_err) error_msg(ierr) = 175
-                           call write_errors(ierr)
-                        end if
-                        idxp(np_max) = idum0(ip)
-                     end if
-                  end do
-                  do ip=1,nq,1
-                     jflag = 0
-                     do iq=1,nq_max,1
-                        if (idum1(ip) == idxq(iq)) then
-                           jflag = 1
-                        end if
-                     end do
-                     if (jflag == 0) then
-                        nq_max = nq_max+1
-                        if (nq_max > dim_iq) then
-                           ierr = ierr + 1
-                           if (ierr < dim_err) error_msg(ierr) = 176
-                           call write_errors(ierr)
-                        end if
-                        idxq(nq_max) = idum1(ip)
-                     end if
-                  end do
-               end if
-            end do
-
-            if ((idx_ex(2) == 1).and.(iwr == 1)) then
-               write(*,*)
-               write(*,*) ' maximum number of pairs in eos.compo      =',np_max
-               write(*,*) ' maximum number of quadruples in eos.compo =',nq_max
-            end if
-         else
-            icnt = 0
-            if (ii /= 1) then
-               allocate(iqtyp(1:np_max),stat=alloc_status)
-               if (alloc_status /= 0) then
-                  ierr = ierr+1
-                  if (ierr < dim_err) error_msg(ierr) = 101
-               end if
-               allocate(iqtyq(1:nq_max),stat=alloc_status)
-               if (alloc_status /= 0) then
-                  ierr = ierr+1
-                  if (ierr < dim_err) error_msg(ierr) = 102
-               end if
-               allocate(qtyp(1:np_max),stat=alloc_status)
-               if (alloc_status /= 0) then
-                  ierr = ierr+1
-                  if (ierr < dim_err) error_msg(ierr) = 103
-               end if
-               allocate(qtyq(1:nq_max,1:3),stat=alloc_status)
-               if (alloc_status /= 0) then
-                  ierr = ierr+1
-                  if (ierr < dim_err) error_msg(ierr) = 104
-               end if
-               allocate(idxp_compo(1:dim_idx(1),1:dim_idx(2),1:dim_idx(3),1:np_max),stat=alloc_status)
-               if (alloc_status /= 0) then
-                  ierr = ierr+1
-                  if (ierr < dim_err) error_msg(ierr) = 105
-               end if
-               allocate(idxq_compo(1:dim_idx(1),1:dim_idx(2),1:dim_idx(3),1:nq_max),stat=alloc_status)
-               if (alloc_status /= 0) then
-                  ierr = ierr+1
-                  if (ierr < dim_err) error_msg(ierr) = 106
-               end if
-               allocate(tabp_compo(1:dim_idx(1),1:dim_idx(2),0:dim_idx(3),1:np_max),stat=alloc_status)
-               if (alloc_status /= 0) then
-                  ierr = ierr+1
-                  if (ierr < dim_err) error_msg(ierr) = 107
-               end if
-               allocate(tabq_compo(0:dim_idx(1),1:dim_idx(2),0:dim_idx(3),1:3*nq_max),stat=alloc_status)
-               if (alloc_status /= 0) then
-                  ierr = ierr+1
-                  if (ierr < dim_err) error_msg(ierr) = 108
-               end if
-
-               allocate(idx_p(1:np_max),stat=alloc_status)
-               if (alloc_status /= 0) then
-                  ierr = ierr+1
-                  if (ierr < dim_err) error_msg(ierr) = 131
-               end if
-               allocate(idx_q(1:nq_max),stat=alloc_status)
-               if (alloc_status /= 0) then
-                  ierr = ierr+1
-                  if (ierr < dim_err) error_msg(ierr) = 132
-               end if
-
-               allocate(idx_compo_p(1:np_max),stat=alloc_status)
-               if (alloc_status /= 0) then
-                  ierr = ierr+1
-                  if (ierr < dim_err) error_msg(ierr) = 134
-               end if
-               allocate(idx_compo_q(1:nq_max),stat=alloc_status)
-               if (alloc_status /= 0) then
-                  ierr = ierr+1
-                  if (ierr < dim_err) error_msg(ierr) = 135
-               end if
-
-               allocate(eos_compo_p(1:np_max),stat=alloc_status)
-               if (alloc_status /= 0) then
-                  ierr = ierr+1
-                  if (ierr < dim_err) error_msg(ierr) = 137
-               end if
-               allocate(eos_compo_q(1:nq_max,1:4),stat=alloc_status)
-               if (alloc_status /= 0) then
-                  ierr = ierr+1
-                  if (ierr < dim_err) error_msg(ierr) = 138
-               end if
-               allocate(eos_q(1:4*nq_max),stat=alloc_status)
-               if (alloc_status /= 0) then
-                  ierr = ierr+1
-                  if (ierr < dim_err) error_msg(ierr) = 145
-               end if
-
-               ! initialization
-               if ((dim_idx(1) > 0).and.(dim_idx(2) > 0).and.(dim_idx(3) > 0)) then
-                  idx_arg(1:dim_idx(1),1:dim_idx(2),1:dim_idx(3),2) = 0
-                  if (np_max > 0) then
-                     idxp_compo(1:dim_idx(1),1:dim_idx(2),1:dim_idx(3),&
-                          1:np_max) = -1
-                     tabp_compo(1:dim_idx(1),1:dim_idx(2),1:dim_idx(3),&
-                          1:np_max) = 0.d00
-                  end if
-                  if (nq_max > 0) then
-                     tabp_compo(1:dim_idx(1),1:dim_idx(2),1:dim_idx(3),&
-                          1:np_max) = 0.d00
-                     idxq_compo(1:dim_idx(1),1:dim_idx(2),1:dim_idx(3),&
-                          1:nq_max) = -1
-                     tabq_compo(1:dim_idx(1),1:dim_idx(2),1:dim_idx(3),&
-                          1:3*nq_max) = 0.d00
-                  end if
-               end if
-               call write_errors(ierr)
-               do while (iflag == 0)
-                  read(iunit,*,iostat=ierror) it,in,iy,iphase,&
-                  np,(iqtyp(iv),qtyp(iv),iv=1,np,1),&
-                  nq,(iqtyq(iw),qtyq(iw,1),qtyq(iw,2),qtyq(iw,3),iw=1,nq,1)
-
-                  if (ierror /= 0) then
-                     iflag = 1
-                  else
-                     it2 = it-min_idx(imap(1))+1
-                     in2 = in-min_idx(imap(2))+1
-                     iy2 = iy-min_idx(imap(3))+1
-
-                     idx_arg(it2,in2,iy2,2) = 1
-                     idx_arg(it2,in2,iy2,4) = iphase
-                     do iv=1,np,1
-                        idxp_compo(it2,in2,iy2,iv) = iqtyp(iv)
-                        tabp_compo(it2,in2,iy2,iv) = qtyp(iv)
-                     end do
-                     do iw=1,nq,1
-                        idxq_compo(it2,in2,iy2,iw) = iqtyq(iw)
-                        tabq_compo(it2,in2,iy2,3*(iw-1)+1) = qtyq(iw,1)
-                        tabq_compo(it2,in2,iy2,3*(iw-1)+2) = qtyq(iw,2)
-                        tabq_compo(it2,in2,iy2,3*(iw-1)+3) = qtyq(iw,3)
-                     end do
-                     icnt = icnt+1
-                  end if
-               end do
-            end if
-            if ((idx_ex(2) == 1).and.(iwr == 1)) then
-               write(*,*)
-               write(*,*) icnt,'entries of composition table read'
-            end if
-         end if
-      else
-         if ((ic == 1).and.(ibl == 0)) then
-            allocate(iqtyp(1:np_max),stat=alloc_status)
-            if (alloc_status /= 0) then
-               ierr = ierr+1
-               if (ierr < dim_err) error_msg(ierr) = 101
-            end if
-            allocate(iqtyq(1:nq_max),stat=alloc_status)
-            if (alloc_status /= 0) then
-               ierr = ierr+1
-               if (ierr < dim_err) error_msg(ierr) = 102
-            end if
-            allocate(qtyp(1:np_max),stat=alloc_status)
-            if (alloc_status /= 0) then
-               ierr = ierr+1
-               if (ierr < dim_err) error_msg(ierr) = 103
-            end if
-            allocate(qtyq(1:nq_max,1:3),stat=alloc_status)
-            if (alloc_status /= 0) then
-               ierr = ierr+1
-               if (ierr < dim_err) error_msg(ierr) = 104
-            end if
-            allocate(idxp_compo(1:dim_idx(1),1:dim_idx(2),1:dim_idx(3),1:np_max),stat=alloc_status)
-            if (alloc_status /= 0) then
-               ierr = ierr+1
-               if (ierr < dim_err) error_msg(ierr) = 105
-            end if
-            allocate(idxq_compo(1:dim_idx(1),1:dim_idx(2),1:dim_idx(3),1:nq_max),stat=alloc_status)
-            if (alloc_status /= 0) then
-               ierr = ierr+1
-               if (ierr < dim_err) error_msg(ierr) = 106
-            end if
-            allocate(tabp_compo(1:dim_idx(1),1:dim_idx(2),0:dim_idx(3),1:np_max),stat=alloc_status)
-            if (alloc_status /= 0) then
-               ierr = ierr+1
-               if (ierr < dim_err) error_msg(ierr) = 107
-            end if
-            allocate(tabq_compo(0:dim_idx(1),1:dim_idx(2),0:dim_idx(3),1:3*nq_max),stat=alloc_status)
-            if (alloc_status /= 0) then
-               ierr = ierr+1
-               if (ierr < dim_err) error_msg(ierr) = 108
-            end if
-
-            allocate(idx_p(1:np_max),stat=alloc_status)
-            if (alloc_status /= 0) then
-               ierr = ierr+1
-               if (ierr < dim_err) error_msg(ierr) = 131
-            end if
-            allocate(idx_q(1:nq_max),stat=alloc_status)
-            if (alloc_status /= 0) then
-               ierr = ierr+1
-               if (ierr < dim_err) error_msg(ierr) = 132
-            end if
-
-            allocate(idx_compo_p(1:np_max),stat=alloc_status)
-            if (alloc_status /= 0) then
-               ierr = ierr+1
-               if (ierr < dim_err) error_msg(ierr) = 134
-            end if
-            allocate(idx_compo_q(1:nq_max),stat=alloc_status)
-            if (alloc_status /= 0) then
-               ierr = ierr+1
-               if (ierr < dim_err) error_msg(ierr) = 135
-            end if
-
-            allocate(eos_compo_p(1:np_max),stat=alloc_status)
-            if (alloc_status /= 0) then
-               ierr = ierr+1
-               if (ierr < dim_err) error_msg(ierr) = 137
-            end if
-            allocate(eos_compo_q(1:nq_max,1:4),stat=alloc_status)
-            if (alloc_status /= 0) then
-               ierr = ierr+1
-               if (ierr < dim_err) error_msg(ierr) = 138
-            end if
-            allocate(eos_q(1:4*nq_max),stat=alloc_status)
-            if (alloc_status /= 0) then
-               ierr = ierr+1
-               if (ierr < dim_err) error_msg(ierr) = 145
-            end if
-
-            ! initialization
-
-            if ((dim_idx(1) > 0).and.(dim_idx(2) > 0).and.(dim_idx(3) > 0)) then
-               idx_arg(1:dim_idx(1),1:dim_idx(2),1:dim_idx(3),2) = 0
-               if (np_max > 0) then
-                  idxp_compo(1:dim_idx(1),1:dim_idx(2),1:dim_idx(3),&
-                       1:np_max) = -1
-                  tabp_compo(1:dim_idx(1),1:dim_idx(2),1:dim_idx(3),&
-                       1:np_max) = 0.d00
-               end if
-               if (nq_max > 0) then
-                  idxq_compo(1:dim_idx(1),1:dim_idx(2),1:dim_idx(3),&
-                       1:nq_max) = -1
-                  tabq_compo(1:dim_idx(1),1:dim_idx(2),1:dim_idx(3),&
-                       1:3*nq_max) = 0.d00
-               end if
-            end if
-            call write_errors(ierr)
-         end if
-      end if
-      close(unit=iunit)
-   end do
-end do
-
-call write_errors(ierr)
-
-if (ii == 1) then
-   write(iunit2,*) np_max,nq_max
-   write(iunit2,*) (idxp(iv),iv=1,np_max,1)
-   write(iunit2,*) (idxq(iv),iv=1,nq_max,1)
-end if
-
-if (ii /= 1) then
-   if (allocated(iqtyp)) deallocate(iqtyp)
-   if (allocated(iqtyq))deallocate(iqtyq)
-   if (allocated(qtyp)) deallocate(qtyp)
-   if (allocated(qtyq)) deallocate(qtyq)
-end if
-
-return
-end SUBROUTINE read_eos_table_compo
-!***********************************************************************
-SUBROUTINE read_eos_table_micro(iwr,nbl,ii,iunit2)
-! Stefan Typel for the CompOSE core team, version 2.03, 2016/11/08
-USE compose_internal
-implicit none
-integer :: iwr,nbl,ii,iunit2
-integer :: ibl,ierror,icnt,it,in,iy,it2,in2,iy2,&
-     iunit,iflag,itmp,ierr,ic,ic_min,ic_max,iv,nm,alloc_status,&
-     idum(dim_im),im,jflag,idxm(dim_im)
-integer, allocatable :: iqtym(:)
-double precision :: dum
-double precision, allocatable :: qtym(:)
-
-!nm_max = 0
-
-if (dim_im > 0) idxm(1:dim_im) = -1
-
-! counter for total number of read table entries
-icnt = 0
-
-! error counter
-ierr = 0
-
-! reading cycles
-idx_ex(3) = 0
-ic_min = 1
-ic_max = 2
-if (ii == 1) then
-   ic_max = 1
-end if
-if (ii == 2) then
-   ic_min = 2
-end if
-do ic=ic_min,ic_max,1
-   if (ic == 1) nm_max = 0
-   open(unit=20,file='eos.micro',&
-        status='old',action='read',iostat=ierror)
-   if (ierror == 0) then
-      itmp = 0
-   else
-      itmp = nbl-1
-   end if
-
-   do ibl=0,itmp,1
-      ! flag for stop reading file
-      iflag = 0
-      iunit = 20+ibl
-
-      choose_file: select case (ibl)
-      case (0)
-         if (itmp > 0) then
-            open(unit=iunit,file='eos.micro0',&
-            status='old',action='read',iostat=ierror)
-         end if
-      case (1)
-         open(unit=iunit,file='eos.micro1',&
-         status='old',action='read',iostat=ierror)
-      case (2)
-         open(unit=iunit,file='eos.micro2',&
-         status='old',action='read',iostat=ierror)
-      case (3)
-         open(unit=iunit,file='eos.micro3',&
-         status='old',action='read',iostat=ierror)
-      case (4)
-         open(unit=iunit,file='eos.micro4',&
-         status='old',action='read',iostat=ierror)
-      case (5)
-         open(unit=iunit,file='eos.micro5',&
-         status='old',action='read',iostat=ierror)
-      case (6)
-         open(unit=iunit,file='eos.micro6',&
-         status='old',action='read',iostat=ierror)
-      case (7)
-         open(unit=iunit,file='eos.micro7',&
-         status='old',action='read',iostat=ierror)
-      case (8)
-         open(unit=iunit,file='eos.micro8',&
-         status='old',action='read',iostat=ierror)
-      case (9)
-         open(unit=iunit,file='eos.micro9',&
-         status='old',action='read',iostat=ierror)
-      end select choose_file
-
-      if (ierror == 0) then
-         idx_ex(3) = 1
-         if (ic == 1) then
-            if (iwr == 1) then
-               write(*,*)
-               write(*,*) ' reading eos table(s) with microscopic information'
-            end if
-
-            do while (iflag == 0)
-               read(iunit,*,iostat=ierror) it,in,iy,&
-               nm,(idum(iv),dum,iv=1,nm,1)
-               if (ierror /= 0) then
-                  iflag = 1
-               else
-                  icnt = icnt+1
-                  do im=1,nm,1
-                     jflag = 0
-                     do iv=1,nm_max,1
-                        if (idum(im) == idxm(iv)) then
-                           jflag = 1
-                        end if
-                     end do
-                     if (jflag == 0) then
-                        nm_max = nm_max+1
-                        if (nm_max > dim_im) then
-                           ierr = ierr + 1
-                           if (ierr < dim_err) error_msg(ierr) = 177
-                           call write_errors(ierr)
-                        end if
-                        idxm(nm_max) = idum(im)
-                     end if
-                  end do
-               end if
-            end do
-            if ((idx_ex(3) == 1).and.(iwr == 1)) then
-               write(*,*)
-               write(*,*) ' maximum number of pairs in eos.micro      =',nm_max
-            end if
-         else
-            icnt = 0
-            if (ii /= 1) then
-               allocate(iqtym(1:nm_max),stat=alloc_status)
-               if (alloc_status /= 0) then
-                  ierr = ierr+1
-                  if (ierr < dim_err) error_msg(ierr) = 109
-               end if
-               allocate(qtym(1:nm_max),stat=alloc_status)
-               if (alloc_status /= 0) then
-                  ierr = ierr+1
-                  if (ierr < dim_err) error_msg(ierr) = 110
-               end if
-               allocate(idx_mic(1:dim_idx(1),1:dim_idx(2),1:dim_idx(3),nm_max),stat=alloc_status)
-               if (alloc_status /= 0) then
-                  ierr = ierr+1
-                  if (ierr < dim_err) error_msg(ierr) = 111
-               end if
-               allocate(tab_mic(1:dim_idx(1),1:dim_idx(2),1:dim_idx(3),nm_max),stat=alloc_status)
-               if (alloc_status /= 0) then
-                  ierr = ierr+1
-                  if (ierr < dim_err) error_msg(ierr) = 112
-               end if
-
-               allocate(idx_m(1:nm_max),stat=alloc_status)
-               if (alloc_status /= 0) then
-                  ierr = ierr+1
-                  if (ierr < dim_err) error_msg(ierr) = 133
-               end if
-               allocate(idx_micro(1:nm_max),stat=alloc_status)
-               if (alloc_status /= 0) then
-                  ierr = ierr+1
-                  if (ierr < dim_err) error_msg(ierr) = 136
-               end if
-               allocate(eos_micro(1:nm_max),stat=alloc_status)
-               if (alloc_status /= 0) then
-                  ierr = ierr+1
-                  if (ierr < dim_err) error_msg(ierr) = 139
-               end if
-
-               ! initialization
-               if ((dim_idx(1) > 0).and.(dim_idx(2) > 0).and.(dim_idx(3) > 0)) then
-                  idx_arg(1:dim_idx(1),1:dim_idx(2),1:dim_idx(3),3) = 0
-                  if (nm_max > 0) then
-                     idx_mic(1:dim_idx(1),1:dim_idx(2),1:dim_idx(3),1:nm_max) = -1
-                     tab_mic(1:dim_idx(1),1:dim_idx(2),1:dim_idx(3),1:nm_max) = 0.d00
-                  end if
-               end if
-            end if
-!         else
-            do while (iflag == 0)
-               read(iunit,*,iostat=ierror) it,in,iy,&
-               nm,(iqtym(iv),qtym(iv),iv=1,nm,1)
-               if (ierror /= 0) then
-                  iflag = 1
-               else
-                  it2 = it-min_idx(imap(1))+1
-                  in2 = in-min_idx(imap(2))+1
-                  iy2 = iy-min_idx(imap(3))+1
-                  idx_arg(it2,in2,iy2,3) = 1
-                  do iv=1,nm,1
-                     idx_mic(it2,in2,iy2,iv) = iqtym(iv)
-                     tab_mic(it2,in2,iy2,iv) = qtym(iv)
-                  end do
-                  icnt = icnt+1
-               end if
-            end do
-            if ((idx_ex(3) == 1).and.(iwr == 1)) then
-               write(*,*)
-               write(*,*) icnt,'entries of microscopic table read'
-            end if
-         end if
-      else
-         if ((ic == 1).and.(ibl == 0)) then
-            allocate(iqtym(1:nm_max),stat=alloc_status)
-            if (alloc_status /= 0) then
-               ierr = ierr+1
-               if (ierr < dim_err) error_msg(ierr) = 109
-            end if
-            allocate(qtym(1:nm_max),stat=alloc_status)
-            if (alloc_status /= 0) then
-               ierr = ierr+1
-               if (ierr < dim_err) error_msg(ierr) = 110
-            end if
-            allocate(idx_mic(1:dim_idx(1),1:dim_idx(2),1:dim_idx(3),nm_max),stat=alloc_status)
-            if (alloc_status /= 0) then
-               ierr = ierr+1
-               if (ierr < dim_err) error_msg(ierr) = 111
-            end if
-            allocate(tab_mic(1:dim_idx(1),1:dim_idx(2),1:dim_idx(3),nm_max),stat=alloc_status)
-            if (alloc_status /= 0) then
-               ierr = ierr+1
-               if (ierr < dim_err) error_msg(ierr) = 112
-            end if
-
-            allocate(idx_m(1:nm_max),stat=alloc_status)
-            if (alloc_status /= 0) then
-               ierr = ierr+1
-               if (ierr < dim_err) error_msg(ierr) = 133
-            end if
-            allocate(idx_micro(1:nm_max),stat=alloc_status)
-            if (alloc_status /= 0) then
-               ierr = ierr+1
-               if (ierr < dim_err) error_msg(ierr) = 136
-            end if
-            allocate(eos_micro(1:nm_max),stat=alloc_status)
-            if (alloc_status /= 0) then
-               ierr = ierr+1
-               if (ierr < dim_err) error_msg(ierr) = 139
-            end if
-
-            ! initialization
-
-            if ((dim_idx(1) > 0).and.(dim_idx(2) > 0).and.(dim_idx(3) > 0)) then
-               idx_arg(1:dim_idx(1),1:dim_idx(2),1:dim_idx(3),3) = 0
-               if (nm_max > 0) then
-                  idx_mic(1:dim_idx(1),1:dim_idx(2),1:dim_idx(3),&
-                       1:nm_max) = -1
-                  tab_mic(1:dim_idx(1),1:dim_idx(2),1:dim_idx(3),&
-                       1:nm_max) = 0.d00
-               end if
-            end if
-         end if
-      end if
-   end do
-   close(unit=iunit)
-end do
-call write_errors(ierr)
-
-if (ii == 1) then
-   write(iunit2,*) nm_max
-   write(iunit2,*) (idxm(iv),iv=1,nm_max,1)
-end if
-
-if (ii /= 1) then
-   if (allocated(iqtym)) deallocate(iqtym)
-   if (allocated(qtym)) deallocate(qtym)
-end if
-
-return
-end SUBROUTINE read_eos_table_micro
 !***********************************************************************
 SUBROUTINE write_errors(ierr)
 ! Stefan Typel for the CompOSE core team, version 1.08, 2017/05/22
@@ -3107,251 +1726,360 @@ end if
 return
 end SUBROUTINE define_eos_table
 !***********************************************************************
-SUBROUTINE get_eos_table(iwr)
-! Stefan Typel for the CompOSE core team, version 1.19, 2017/12/13
-USE compose_internal
-USE m_out_to_json
+subroutine get_eos_table(iwr)
+ ! Stefan Typel for the CompOSE core team, version 1.19, 2017/12/13
+ use compose_internal
+ use m_out_to_json
 #if defined hdf5
-USE hdfparameters
+ use hdfparameters
 #endif
 
-implicit none
-integer :: i,i_tny,i_beta,i_tab,ipl_t,ipl_n,ipl_y,itest,iwr,&
-     i1,i2,i3,i4,i5,i6,i7,j_t,j_nb,j_yq,n_t,n_nb,n_yq,&
-     i_t,i_nb,i_yq,i_entr,&
-     j_b,n_b,i_b,ierr,iunit,ierror,iunit2,n_tnyb,ipl(3)
+ implicit none
+ integer :: i,i_tny,i_beta,i_tab,ipl_t,ipl_n,ipl_y,itest,iwr,&
+   i1,i2,i3,i4,i5,i6,i7,j_t,j_nb,j_yq,n_t,n_nb,n_yq,&
+   i_t,i_nb,i_yq,i_entr,&
+   j_b,n_b,i_b,ierr,iunit,ierror,iunit2,n_tnyb,ipl(3)
 
-double precision :: t_min,t_max,d_t,nb_min,nb_max,d_nb,&
-     yq_min,yq_max,d_yq,b_min,b_max,d_b,t,n,y,b
+ double precision :: t_min,t_max,d_t,nb_min,nb_max,d_nb,&
+   yq_min,yq_max,d_yq,b_min,b_max,d_b,t,n,y,b
 
-if (iwr == 1) then
+ if (iwr == 1) then
    write(*,*)
    write(*,*) ' begin generating eos table'
-end if
+ end if
 
-itest = 0
+ itest = 0
 
-ierr = 0
+ ierr = 0
 
-if (itest == 0) then
+ if (itest == 0) then
 
    iunit = 20
    open(unit=iunit,file='eos.parameters',&
-        status='old',action='read',iostat=ierror)
+     status='old',action='read',iostat=ierror)
    if (ierror == 0) then
-      if (iwr ==1) then
+     if (iwr ==1) then
+       write(*,*)
+       write(*,*) ' reading parameters'
+     end if
+
+     read(iunit,*)
+     read(iunit,*) ipl_t,ipl_n,ipl_y
+     if ((ipl_t < 1).or.(ipl_t > 3)) then
+       ierr = ierr+1
+       if (ierr < dim_err) error_msg(ierr) = 70
+     end if
+     if ((ipl_n < 1).or.(ipl_n > 3)) then
+       ierr = ierr+1
+       if (ierr < dim_err) error_msg(ierr) = 71
+     end if
+     if ((ipl_y < 1).or.(ipl_y > 3)) then
+       ierr = ierr+1
+       if (ierr < dim_err) error_msg(ierr) = 72
+     end if
+
+     ipl(1) = ipl_t
+     ipl(2) = ipl_n
+     ipl(3) = ipl_y
+
+     read(iunit,*)
+     read(iunit,*) i_beta,i_entr
+     if (i_beta == 1) then
+       if ((imap(3) /= 3).or.(incl_l /= 1).or.(dim_idx(3) < 2)) then
+         ierr = ierr+1
+         if (ierr < dim_err) error_msg(ierr) = 160
+       end if
+     end if
+     if (i_entr /= 1) i_entr = 0
+
+     if (iwr == 1) then
+       if (i_beta == 1) then
          write(*,*)
-         write(*,*) ' reading parameters'
-      end if
+         write(*,*) ' EoS table for condition of beta equilibrium'
+       end if
+       if (i_entr == 1) then
+         write(*,*)
+         write(*,*) ' EoS table for given entropy per baryon'
+       end if
+     end if
 
-      read(iunit,*)
-      read(iunit,*) ipl_t,ipl_n,ipl_y
-      if ((ipl_t < 1).or.(ipl_t > 3)) then
-         ierr = ierr+1
-         if (ierr < dim_err) error_msg(ierr) = 70
-      end if
-      if ((ipl_n < 1).or.(ipl_n > 3)) then
-         ierr = ierr+1
-         if (ierr < dim_err) error_msg(ierr) = 71
-      end if
-      if ((ipl_y < 1).or.(ipl_y > 3)) then
-         ierr = ierr+1
-         if (ierr < dim_err) error_msg(ierr) = 72
-      end if
+     call write_errors(ierr)
 
-      ipl(1) = ipl_t
-      ipl(2) = ipl_n
-      ipl(3) = ipl_y
+     read(iunit,*)
+     read(iunit,*) i_tab
+     read(iunit,*)
+     if (i_tab == 0) then
+       read(iunit,*) n_tnyb
+       if (n_tnyb < 1) then
+         ierr = ierr +1
+         if (ierr < dim_err) error_msg(ierr) = 80
+       end if
+     else
 
-      read(iunit,*)
-      read(iunit,*) i_beta,i_entr
-      if (i_beta == 1) then
-         if ((imap(3) /= 3).or.(incl_l /= 1).or.(dim_idx(3) < 2)) then
-            ierr = ierr+1
-            if (ierr < dim_err) error_msg(ierr) = 160
+       if (irpl == 0) then
+         read(iunit,*) t_min,nb_min,yq_min
+         read(iunit,*) t_max,nb_max,yq_max
+         read(iunit,*) n_t,n_nb,n_yq
+         read(iunit,*) i_t,i_nb,i_yq
+       else
+         read(iunit,*) t_min,nb_min,yq_min,b_min
+         read(iunit,*) t_max,nb_max,yq_max,b_max
+         read(iunit,*) n_t,n_nb,n_yq,n_b
+         read(iunit,*) i_t,i_nb,i_yq,i_b
+       end if
+
+       if (i_t == 0) then
+       else
+         if (t_min <= 0.d00) then
+           ierr = ierr +1
+           if (ierr < dim_err) error_msg(ierr) = 82
          end if
-      end if
-      if (i_entr /= 1) i_entr = 0
-
-      if (iwr == 1) then
-         if (i_beta == 1) then
-            write(*,*)
-            write(*,*) ' EoS table for condition of beta equilibrium'
-         end if
-         if (i_entr == 1) then
-            write(*,*)
-            write(*,*) ' EoS table for given entropy per baryon'
-         end if
-      end if
-
-      call write_errors(ierr)
-
-      read(iunit,*)
-      read(iunit,*) i_tab
-      read(iunit,*)
-      if (i_tab == 0) then
-         read(iunit,*) n_tnyb
-         if (n_tnyb < 1) then
-            ierr = ierr +1
-            if (ierr < dim_err) error_msg(ierr) = 80
-         end if
-      else
-
-         if (irpl == 0) then
-            read(iunit,*) t_min,nb_min,yq_min
-            read(iunit,*) t_max,nb_max,yq_max
-            read(iunit,*) n_t,n_nb,n_yq
-            read(iunit,*) i_t,i_nb,i_yq
+       end if
+       if (t_max < t_min) then
+         ierr = ierr +1
+         if (ierr < dim_err) error_msg(ierr) = 83
+       end if
+       if (n_t < 1) n_t = 1
+       if (i_t == 0) then
+         if (n_t == 1) then
+           d_t = 0.d00
          else
-            read(iunit,*) t_min,nb_min,yq_min,b_min
-            read(iunit,*) t_max,nb_max,yq_max,b_max
-            read(iunit,*) n_t,n_nb,n_yq,n_b
-            read(iunit,*) i_t,i_nb,i_yq,i_b
+           d_t = (t_max-t_min)/dble(n_t-1)
          end if
-
-         if (i_t == 0) then
+       else
+         if (n_t == 1) then
+           d_t = 1.d00
          else
-            if (t_min <= 0.d00) then
-               ierr = ierr +1
-               if (ierr < dim_err) error_msg(ierr) = 82
-            end if
+           d_t = exp(log(t_max/t_min)/dble(n_t-1))
          end if
-         if (t_max < t_min) then
-            ierr = ierr +1
-            if (ierr < dim_err) error_msg(ierr) = 83
-         end if
-         if (n_t < 1) n_t = 1
-         if (i_t == 0) then
-            if (n_t == 1) then
-               d_t = 0.d00
-            else
-               d_t = (t_max-t_min)/dble(n_t-1)
-            end if
+       end if
+
+       if (nb_max < nb_min) then
+         ierr = ierr +1
+         if (ierr < dim_err) error_msg(ierr) = 85
+       end if
+       if (n_nb < 1) n_nb = 1
+       if (i_nb == 0) then
+         if (n_nb == 1) then
+           d_nb = 0.d00
          else
-            if (n_t == 1) then
-               d_t = 1.d00
-            else
-               d_t = exp(log(t_max/t_min)/dble(n_t-1))
-            end if
+           d_nb = (nb_max-nb_min)/dble(n_nb-1)
          end if
-
-         if (nb_max < nb_min) then
-            ierr = ierr +1
-            if (ierr < dim_err) error_msg(ierr) = 85
-         end if
-         if (n_nb < 1) n_nb = 1
-         if (i_nb == 0) then
-            if (n_nb == 1) then
-               d_nb = 0.d00
-            else
-               d_nb = (nb_max-nb_min)/dble(n_nb-1)
-            end if
+       else
+         if (n_nb == 1) then
+           d_nb = 1.d00
          else
-            if (n_nb == 1) then
-               d_nb = 1.d00
-            else
-               d_nb = exp(log(nb_max/nb_min)/dble(n_nb-1))
-            end if
+           d_nb = exp(log(nb_max/nb_min)/dble(n_nb-1))
          end if
+       end if
 
-         if (i_beta /= 0) then
-            yq_min = 0.d00
-            yq_max = 0.d00
-            d_yq = 0.d00
-            n_yq = 1
+       if (i_beta /= 0) then
+         yq_min = 0.d00
+         yq_max = 0.d00
+         d_yq = 0.d00
+         n_yq = 1
+       else
+
+         if (yq_max < yq_min) then
+           ierr = ierr +1
+           if (ierr < dim_err) error_msg(ierr) = 87
+         end if
+         if (yq_max > 1.d00) then
+           ierr = ierr +1
+           if (ierr < dim_err) error_msg(ierr) = 88
+         end if
+         if (n_yq < 1) n_yq = 1
+         if (i_yq == 0) then
+           if (n_yq == 1) then
+             d_yq = 0.d00
+           else
+             d_yq = (yq_max-yq_min)/dble(n_yq-1)
+           end if
          else
-
-            if (yq_max < yq_min) then
-               ierr = ierr +1
-               if (ierr < dim_err) error_msg(ierr) = 87
-            end if
-            if (yq_max > 1.d00) then
-               ierr = ierr +1
-               if (ierr < dim_err) error_msg(ierr) = 88
-            end if
-            if (n_yq < 1) n_yq = 1
-            if (i_yq == 0) then
-               if (n_yq == 1) then
-                  d_yq = 0.d00
-               else
-                  d_yq = (yq_max-yq_min)/dble(n_yq-1)
-               end if
-            else
-               if (n_yq == 1) then
-                  d_yq = 1.d00
-               else
-                  d_yq = exp(log(yq_max/yq_min)/dble(n_yq-1))
-               end if
-            end if
+           if (n_yq == 1) then
+             d_yq = 1.d00
+           else
+             d_yq = exp(log(yq_max/yq_min)/dble(n_yq-1))
+           end if
          end if
+       end if
 
-         if (irpl > 0) then
+       if (irpl > 0) then
 
-            if (b_max < b_min) then
-               ierr = ierr +1
-               if (ierr < dim_err) error_msg(ierr) = 90
-            end if
-            if (n_b < 1) n_b = 1
-            if (i_b == 0) then
-               if (n_b == 1) then
-                  d_b = 0.d00
-               else
-                  d_b = (b_max-b_min)/dble(n_b-1)
-               end if
-            else
-               if (n_b == 1) then
-                  d_b = 1.d00
-               else
-                  d_b = exp(log(b_max/b_min)/dble(n_b-1))
-               end if
-            end if
+         if (b_max < b_min) then
+           ierr = ierr +1
+           if (ierr < dim_err) error_msg(ierr) = 90
+         end if
+         if (n_b < 1) n_b = 1
+         if (i_b == 0) then
+           if (n_b == 1) then
+             d_b = 0.d00
+           else
+             d_b = (b_max-b_min)/dble(n_b-1)
+           end if
          else
-            b_min = 0.d00
-            b_max = 0.d00
-            d_b = 0.d00
-            n_b = 1
-            i_b = 0
+           if (n_b == 1) then
+             d_b = 1.d00
+           else
+             d_b = exp(log(b_max/b_min)/dble(n_b-1))
+           end if
          end if
-      end if
+       else
+         b_min = 0.d00
+         b_max = 0.d00
+         d_b = 0.d00
+         n_b = 1
+         i_b = 0
+       end if
+     end if
 
-      ! output in ASCII or HDF5 format
-      iunit2 = 21
-      if (iout == 1) then
-         ! ASCII
-         open(unit=iunit2,file='eos.table',&
-              status='unknown',action='write',iostat=ierror)
-      else
-         ! HDF5
+     ! output in ASCII or HDF5 format
+     iunit2 = 21
+     if (iout == 1) then
+       ! ASCII
+       open(unit=iunit2,file='eos.table',&
+         status='unknown',action='write',iostat=ierror)
+     else
+       ! HDF5
 #if defined hdf5
-         IF(i_tab == 0) then
-            call initialise_hdf5(n_tnyb,1,1,i_tab)
-         else
-            call initialise_hdf5(n_nb,n_t,n_yq,i_tab)
-         end IF
+       IF(i_tab == 0) then
+         call initialise_hdf5(n_tnyb,1,1,i_tab)
+       else
+         call initialise_hdf5(n_nb,n_t,n_yq,i_tab)
+       end IF
 #endif
-      end if
+     end if
 
-      if (ierror == 0) then
-         if (ierr == 0) then
-            if (i_tab == 0) then
-               ! use list of parameters from file eos.parameters
-               do i_tny=1,n_tnyb,1
-                  if (irpl > 0) then
-                     read(iunit,*) t,n,y,b
-                  else
-                     read(iunit,*) t,n,y
-                  endif
-                  !++++++++++++++++++++++++++++++++++++++
-                  call get_eos(t,n,y,b,ipl,i_beta,i_entr)
-                  !++++++++++++++++++++++++++++++++++++++
-                  if (i_entr > 1) then
+     if (ierror == 0) then
+       if (ierr == 0) then
+         if (i_tab == 0) then
+           ! use list of parameters from file eos.parameters
+           do i_tny=1,n_tnyb,1
+             if (irpl > 0) then
+               read(iunit,*) t,n,y,b
+             else
+               read(iunit,*) t,n,y
+             endif
+             !++++++++++++++++++++++++++++++++++++++
+             call get_eos(t,n,y,b,ipl,i_beta,i_entr)
+             !++++++++++++++++++++++++++++++++++++++
+             if (i_entr > 1) then
+               write(*,*) ' no solution found for S =',t,&
+                 ' at n_b =',arg2(2),' fm^-3 and Y_q =',arg2(3)
+               i_entr = 1
+             else
+               ! no output if no solution of beta equilibrium
+               if (iout == 1) then
+                 ! ASCII
+                 do i=1,n_q,1
+                   eos_q(3*(i-1)+1) = eos_compo_q(i,1)
+                   eos_q(3*(i-1)+2) = eos_compo_q(i,2)
+                   eos_q(3*(i-1)+3) = eos_compo_q(i,3)
+                   eos_q(3*(i-1)+4) = eos_compo_q(i,4)
+                 end do
+                 if (irpl > 0) then
+                   write(iunit2,*) arg2(1),arg2(2),arg2(3),arg2(4),&
+                     (eos_thermo(idx_qty(i1)),i1=1,n_qty,1),&
+                     (eos_thermo_add(i2),i2=1,n_add,1),&
+                     (eos_compo_p(i3),i3=1,n_p,1),&
+                     (eos_q(i4),i4=1,4*n_q,1),&
+                     (eos_micro(i5),i5=1,n_m,1),&
+                     (eos_thermo_err(idx_err(i6)),i6=1,n_err,1)
+
+                 else
+                   write(iunit2,*) arg2(1),arg2(2),arg2(3),&
+                     (eos_thermo(idx_qty(i1)),i1=1,n_qty,1),&
+                     (eos_thermo_add(i2),i2=1,n_add,1),&
+                     (eos_df(idx_df(i7)),i7=1,n_df,1),&
+                     (eos_compo_p(i3),i3=1,n_p,1),&
+                     (eos_q(i4),i4=1,4*n_q,1),&
+                     (eos_micro(i5),i5=1,n_m,1),&
+                     (eos_thermo_err(idx_err(i6)),i6=1,n_err,1)
+                 end if
+               else
+                 ! HDF5
+#if defined hdf5
+                 t_hdf5(i_tny) = arg2(1)
+                 nb_hdf5(i_tny) = arg2(2)
+                 y_q_hdf5(i_tny) = arg2(3)
+                 IF(n_qty.ne.0) then
+                   thermo_hdf5(i_tny,1,1,1:n_qty) = eos_thermo(idx_qty(1:n_qty))
+                   index_thermo(1:n_qty) = idx_qty(1:n_qty)
+                 end IF
+                 IF(n_add.ne.0) then
+                   thermo_hdf5_add(i_tny,1,1,1:n_add) = eos_thermo_add(1:n_add)
+                   index_thermo_add(1:n_add) = idx_add(1:n_add)
+                 end IF
+                 IF(n_p.ne.0) then
+                   yi_hdf5(i_tny,1,1,1:n_p) = eos_compo_p(1:n_p)
+                   index_yi(1:n_p) = idx_p(1:n_p)
+                 end IF
+                 IF(n_q.ne.0) then
+                   !2017/10/09 ->
+                   yav_hdf5(i_tny,1,1,1:n_q) = eos_compo_q(1:n_q,1)
+                   aav_hdf5(i_tny,1,1,1:n_q) = eos_compo_q(1:n_q,2)
+                   zav_hdf5(i_tny,1,1,1:n_q) = eos_compo_q(1:n_q,3)
+                   nav_hdf5(i_tny,1,1,1:n_q) = eos_compo_q(1:n_q,4)
+                   !2017/10/09 <-
+                   index_av(1:n_q) = idx_q(1:n_q)
+                 end IF
+                 IF(n_m.ne.0) then
+                   micro_hdf5(i_tny,1,1,1:n_m) = eos_micro(1:n_m)
+                   index_micro(1:n_m) = idx_m(1:n_m)
+                 end IF
+                 IF(n_err.ne.0) then
+                   err_hdf5(i_tny,1,1,1:n_err) = eos_thermo_err(idx_err(1:n_err))
+                   index_err(1:n_err) = idx_err(1:n_err)
+                 end IF
+#endif
+               end if
+               !                     end if   (15/03/2018)
+             end if
+           end do
+         else
+           ! use cycle form of parameters from file eos.parameters
+           do j_t=1,n_t,1
+
+             if (i_t == 0) then
+               t = t_min+d_t*dble(j_t-1)
+             else
+               t = t_min*(d_t**(j_t-1))
+             end if
+
+             do j_nb=1,n_nb,1
+               if (i_nb == 0) then
+                 n = nb_min+d_nb*dble(j_nb-1)
+               else
+                 n = nb_min*(d_nb**(j_nb-1))
+               end if
+
+               do j_yq=1,n_yq,1
+                 if (i_yq == 0) then
+                   y = yq_min+d_yq*dble(j_yq-1)
+                 else
+                   y = yq_min*(d_yq**(j_yq-1))
+                 end if
+
+                 do j_b=1,n_b,1
+                   if (i_b == 0) then
+                     b = b_min+d_b*dble(j_b-1)
+                   else
+                     b = b_min*(d_b**(j_b-1))
+                   end if
+#if defined hdf5
+                   ! magnetic field not yet implemented for HDF5 output
+#endif
+                   !++++++++++++++++++++++++++++++++++++++
+                   call get_eos(t,n,y,b,ipl,i_beta,i_entr)
+                   !++++++++++++++++++++++++++++++++++++++
+                   if (i_entr > 1) then
                      write(*,*) ' no solution found for S =',t,&
-                          ' at n_b =',arg2(2),' fm^-3 and Y_q =',arg2(3)
+                       ' at n_b =',arg(2),' fm^-3 and Y_q =',arg(3)
                      i_entr = 1
                    else
                      ! no output if no solution of beta equilibrium
                      if (iout == 1) then
-                       ! ASCII
+                       !ASCII
                        do i=1,n_q,1
                          eos_q(3*(i-1)+1) = eos_compo_q(i,1)
                          eos_q(3*(i-1)+2) = eos_compo_q(i,2)
@@ -3366,7 +2094,6 @@ if (itest == 0) then
                            (eos_q(i4),i4=1,4*n_q,1),&
                            (eos_micro(i5),i5=1,n_m,1),&
                            (eos_thermo_err(idx_err(i6)),i6=1,n_err,1)
-
                        else
                          write(iunit2,*) arg2(1),arg2(2),arg2(3),&
                            (eos_thermo(idx_qty(i1)),i1=1,n_qty,1),&
@@ -3376,188 +2103,80 @@ if (itest == 0) then
                            (eos_q(i4),i4=1,4*n_q,1),&
                            (eos_micro(i5),i5=1,n_m,1),&
                            (eos_thermo_err(idx_err(i6)),i6=1,n_err,1)
-                       end if
+                       endif
                      else
-                          ! HDF5
+                       ! HDF5
 #if defined hdf5
-                           t_hdf5(i_tny) = arg2(1)
-                           nb_hdf5(i_tny) = arg2(2)
-                           y_q_hdf5(i_tny) = arg2(3)
-                           IF(n_qty.ne.0) then
-                              thermo_hdf5(i_tny,1,1,1:n_qty) = eos_thermo(idx_qty(1:n_qty))
-                              index_thermo(1:n_qty) = idx_qty(1:n_qty)
-                           end IF
-                           IF(n_add.ne.0) then
-                              thermo_hdf5_add(i_tny,1,1,1:n_add) = eos_thermo_add(1:n_add)
-                              index_thermo_add(1:n_add) = idx_add(1:n_add)
-                           end IF
-                           IF(n_p.ne.0) then
-                              yi_hdf5(i_tny,1,1,1:n_p) = eos_compo_p(1:n_p)
-                              index_yi(1:n_p) = idx_p(1:n_p)
-                           end IF
-                           IF(n_q.ne.0) then
-                              !2017/10/09 ->
-                              yav_hdf5(i_tny,1,1,1:n_q) = eos_compo_q(1:n_q,1)
-                              aav_hdf5(i_tny,1,1,1:n_q) = eos_compo_q(1:n_q,2)
-                              zav_hdf5(i_tny,1,1,1:n_q) = eos_compo_q(1:n_q,3)
-                              nav_hdf5(i_tny,1,1,1:n_q) = eos_compo_q(1:n_q,4)
-                              !2017/10/09 <-
-                              index_av(1:n_q) = idx_q(1:n_q)
-                           end IF
-                           IF(n_m.ne.0) then
-                              micro_hdf5(i_tny,1,1,1:n_m) = eos_micro(1:n_m)
-                              index_micro(1:n_m) = idx_m(1:n_m)
-                           end IF
-                           IF(n_err.ne.0) then
-                              err_hdf5(i_tny,1,1,1:n_err) = eos_thermo_err(idx_err(1:n_err))
-                              index_err(1:n_err) = idx_err(1:n_err)
-                           end IF
+                       !2017/05/23
+                       t_hdf5(j_t) = arg2(1)
+                       nb_hdf5(j_nb) = arg2(2)
+                       y_q_hdf5(j_yq) = arg2(3)
+                       IF(n_qty.ne.0) then
+                         thermo_hdf5(j_nb,j_t,j_yq,1:n_qty) = eos_thermo(idx_qty(1:n_qty))
+                         index_thermo(1:n_qty) = idx_qty(1:n_qty)
+                       end IF
+                       IF(n_add.ne.0) then
+                         thermo_hdf5_add(j_nb,j_t,j_yq,1:n_add) = eos_thermo_add(1:n_add)
+                         index_thermo_add(1:n_add) = idx_add(1:n_add)
+                       end IF
+                       IF(n_p.ne.0) then
+                         yi_hdf5(j_nb,j_t,j_yq,1:n_p) = eos_compo_p(1:n_p)
+                         index_yi(1:n_p) = idx_p(1:n_p)
+                       end IF
+                       IF(n_q.ne.0) then
+                         !2017/10/09 ->
+                         yav_hdf5(j_nb,j_t,j_yq,1:n_q) = eos_compo_q(1:n_q,1)
+                         aav_hdf5(j_nb,j_t,j_yq,1:n_q) = eos_compo_q(1:n_q,2)
+                         zav_hdf5(j_nb,j_t,j_yq,1:n_q) = eos_compo_q(1:n_q,3)
+                         nav_hdf5(j_nb,j_t,j_yq,1:n_q) = eos_compo_q(1:n_q,4)
+                         !2017/70/09 <-
+                         index_av(1:n_q) = idx_q(1:n_q)
+                       end IF
+                       IF(n_m.ne.0) then
+                         micro_hdf5(j_nb,j_t,j_yq,1:n_m) = eos_micro(1:n_m)
+                         index_micro(1:n_m) = idx_m(1:n_m)
+                       end IF
+                       IF(n_err.ne.0) then
+                         err_hdf5(j_nb,j_t,j_yq,1:n_err) = eos_thermo_err(idx_err(1:n_err))
+                         index_err(1:n_err) = idx_err(1:n_err)
+                       end IF
+
 #endif
-                        end if
-!                     end if   (15/03/2018)
-                  end if
-               end do
-            else
-               ! use cycle form of parameters from file eos.parameters
-               do j_t=1,n_t,1
-
-                  if (i_t == 0) then
-                     t = t_min+d_t*dble(j_t-1)
-                  else
-                     t = t_min*(d_t**(j_t-1))
-                  end if
-
-                  do j_nb=1,n_nb,1
-                     if (i_nb == 0) then
-                        n = nb_min+d_nb*dble(j_nb-1)
-                     else
-                        n = nb_min*(d_nb**(j_nb-1))
                      end if
-
-                     do j_yq=1,n_yq,1
-                        if (i_yq == 0) then
-                           y = yq_min+d_yq*dble(j_yq-1)
-                        else
-                           y = yq_min*(d_yq**(j_yq-1))
-                        end if
-
-                        do j_b=1,n_b,1
-                           if (i_b == 0) then
-                              b = b_min+d_b*dble(j_b-1)
-                           else
-                              b = b_min*(d_b**(j_b-1))
-                           end if
-#if defined hdf5
-! magnetic field not yet implemented for HDF5 output
-#endif
-                           !++++++++++++++++++++++++++++++++++++++
-                           call get_eos(t,n,y,b,ipl,i_beta,i_entr)
-                           !++++++++++++++++++++++++++++++++++++++
-                           if (i_entr > 1) then
-                              write(*,*) ' no solution found for S =',t,&
-                                   ' at n_b =',arg(2),' fm^-3 and Y_q =',arg(3)
-                              i_entr = 1
-                           else
-                                 ! no output if no solution of beta equilibrium
-                                 if (iout == 1) then
-                                    !ASCII
-                                    do i=1,n_q,1
-                                       eos_q(3*(i-1)+1) = eos_compo_q(i,1)
-                                       eos_q(3*(i-1)+2) = eos_compo_q(i,2)
-                                       eos_q(3*(i-1)+3) = eos_compo_q(i,3)
-                                       eos_q(3*(i-1)+4) = eos_compo_q(i,4)
-                                    end do
-                                    if (irpl > 0) then
-                                       write(iunit2,*) arg2(1),arg2(2),arg2(3),arg2(4),&
-                                            (eos_thermo(idx_qty(i1)),i1=1,n_qty,1),&
-                                            (eos_thermo_add(i2),i2=1,n_add,1),&
-                                            (eos_compo_p(i3),i3=1,n_p,1),&
-                                            (eos_q(i4),i4=1,4*n_q,1),&
-                                            (eos_micro(i5),i5=1,n_m,1),&
-                                            (eos_thermo_err(idx_err(i6)),i6=1,n_err,1)
-                                    else
-                                       write(iunit2,*) arg2(1),arg2(2),arg2(3),&
-                                            (eos_thermo(idx_qty(i1)),i1=1,n_qty,1),&
-                                            (eos_thermo_add(i2),i2=1,n_add,1),&
-                                            (eos_df(idx_df(i7)),i7=1,n_df,1),&
-                                            (eos_compo_p(i3),i3=1,n_p,1),&
-                                            (eos_q(i4),i4=1,4*n_q,1),&
-                                            (eos_micro(i5),i5=1,n_m,1),&
-                                            (eos_thermo_err(idx_err(i6)),i6=1,n_err,1)
-                                    endif
-                                 else
-                                    ! HDF5
-#if defined hdf5
-                                    !2017/05/23
-                                    t_hdf5(j_t) = arg2(1)
-                                    nb_hdf5(j_nb) = arg2(2)
-                                    y_q_hdf5(j_yq) = arg2(3)
-                                    IF(n_qty.ne.0) then
-                                       thermo_hdf5(j_nb,j_t,j_yq,1:n_qty) = eos_thermo(idx_qty(1:n_qty))
-                                       index_thermo(1:n_qty) = idx_qty(1:n_qty)
-                                    end IF
-                                    IF(n_add.ne.0) then
-                                       thermo_hdf5_add(j_nb,j_t,j_yq,1:n_add) = eos_thermo_add(1:n_add)
-                                       index_thermo_add(1:n_add) = idx_add(1:n_add)
-                                    end IF
-                                    IF(n_p.ne.0) then
-                                       yi_hdf5(j_nb,j_t,j_yq,1:n_p) = eos_compo_p(1:n_p)
-                                       index_yi(1:n_p) = idx_p(1:n_p)
-                                    end IF
-                                    IF(n_q.ne.0) then
-                                       !2017/10/09 ->
-                                       yav_hdf5(j_nb,j_t,j_yq,1:n_q) = eos_compo_q(1:n_q,1)
-                                       aav_hdf5(j_nb,j_t,j_yq,1:n_q) = eos_compo_q(1:n_q,2)
-                                       zav_hdf5(j_nb,j_t,j_yq,1:n_q) = eos_compo_q(1:n_q,3)
-                                       nav_hdf5(j_nb,j_t,j_yq,1:n_q) = eos_compo_q(1:n_q,4)
-                                       !2017/70/09 <-
-                                       index_av(1:n_q) = idx_q(1:n_q)
-                                    end IF
-                                    IF(n_m.ne.0) then
-                                       micro_hdf5(j_nb,j_t,j_yq,1:n_m) = eos_micro(1:n_m)
-                                       index_micro(1:n_m) = idx_m(1:n_m)
-                                    end IF
-                                    IF(n_err.ne.0) then
-                                       err_hdf5(j_nb,j_t,j_yq,1:n_err) = eos_thermo_err(idx_err(1:n_err))
-                                       index_err(1:n_err) = idx_err(1:n_err)
-                                    end IF
-
-#endif
-                                 end if
-!                              end if
-                           end if
-                        end do
-                     end do
-                  end do
+                     !                              end if
+                   end if
+                 end do
                end do
-            end if
+             end do
+           end do
          end if
-      end if
+       end if
+     end if
    end if
    if (iout == 1) then
-      ! ASCII
-      close(unit=iunit2)
+     ! ASCII
+     close(unit=iunit2)
    else
-      ! HDF5
+     ! HDF5
 #if defined hdf5
-      write(*,*)'call writing HDF5 table'
-      call write_hdf5(i_tab)
-      call close_hdf5
-! testing purposes
-      call read_hdf5(i_tab)
-      call close_hdf5
-!****************
+     write(*,*)'call writing HDF5 table'
+     call write_hdf5(i_tab)
+     call close_hdf5
+     ! testing purposes
+     call read_hdf5(i_tab)
+     call close_hdf5
+     !****************
 #endif
    end if
    close(unit=iunit)
 
-else
+ else
    ! only for testing
-end if
+ end if
 
-call write_errors(ierr)
+ call write_errors(ierr)
 
-if (iwr == 1) then
+ if (iwr == 1) then
    i2 = 0
    write(*,*)
    write(*,*) ' end generating EoS table'
@@ -3573,139 +2192,139 @@ if (iwr == 1) then
    i2 = i2+1
    write(*,*) i2,' hadronic charge fraction Y_q                       []           '
    if (irpl > 0) then
-      i2 = i2+1
-      write(*,*) i2,' magnetic field strength B                          [G]          '
+     i2 = i2+1
+     write(*,*) i2,' magnetic field strength B                          [G]          '
    endif
    do i1=1,n_qty,1
-      i2 = i2+1
-      if (idx_qty(i1) == 1)&
-           write(*,*) i2,' pressure p                                         [MeV fm^-3]  '
-      if (idx_qty(i1) == 2)&
-           write(*,*) i2,' entropy per baryon S                               []           '
-      if (idx_qty(i1) == 3)&
-           write(*,*) i2,' shifted baryon chemical potential mu_b-m_n         [MeV]        '
-      if (idx_qty(i1) == 4)&
-           write(*,*) i2,' charge chemical potential mu_q                     [MeV]        '
-      if (idx_qty(i1) == 5)&
-           write(*,*) i2,' lepton chemical potential mu_l                     [MeV]        '
-      if (idx_qty(i1) == 6)&
-           write(*,*) i2,' scaled free energy per baryon F/m_n-1              []           '
-      if (idx_qty(i1) == 7)&
-           write(*,*) i2,' scaled internal energy per baryon E/m_n-1          []           '
-      if (idx_qty(i1) == 8)&
-           write(*,*) i2,' scaled enthalpy energy per baryon H/m_n-1          []           '
-      if (idx_qty(i1) == 9)&
-           write(*,*) i2,' scaled free enthalpy per baryon G/m_n-1            []           '
-      if (idx_qty(i1) == 10)&
-           write(*,*) i2,' derivative dp/dn_b|E                               [MeV]        '
-      if (idx_qty(i1) == 11)&
-           write(*,*) i2,' derivative p/dE|n_b                                [fm^-3]      '
-      if (idx_qty(i1) == 12)&
-           write(*,*) i2,' square of speed of sound (c_s)^2                   []           '
-      if (idx_qty(i1) == 13)&
-           write(*,*) i2,' specific heat capacity at constant volume c_V      []           '
-      if (idx_qty(i1) == 14)&
-           write(*,*) i2,' specific heat capacity at constant pressure c_p    []           '
-      if (idx_qty(i1) == 15)&
-           write(*,*) i2,' adiabatic index Gamma                              []           '
-      if (idx_qty(i1) == 16)&
-           write(*,*) i2,' expansion coefficient at constant pressure alpha_p [MeV^-1]     '
-      if (idx_qty(i1) == 17)&
-           write(*,*) i2,' tension coefficient at constant volume beta_V      [fm^-3]      '
-      if (idx_qty(i1) == 18)&
-           write(*,*) i2,' isothermal compressibility kappa_T                 [MeV^-1 fm^3]'
-      if (idx_qty(i1) == 19)&
-           write(*,*) i2,' isentropic compressibility kappa_S                 [MeV^-1 fm^3]'
-      if (idx_qty(i1) == 20)&
-           write(*,*) i2,' free energy per baryon F                           [MeV]        '
-      if (idx_qty(i1) == 21)&
-           write(*,*) i2,' internal energy per baryon E                       [MeV]        '
-      if (idx_qty(i1) == 22)&
-           write(*,*) i2,' enthalpy per baryon H                              [MeV]        '
-      if (idx_qty(i1) == 23)&
-           write(*,*) i2,' free enthalpy per baryon G                         [MeV]        '
+     i2 = i2+1
+     if (idx_qty(i1) == 1)&
+       write(*,*) i2,' pressure p                                         [MeV fm^-3]  '
+     if (idx_qty(i1) == 2)&
+       write(*,*) i2,' entropy per baryon S                               []           '
+     if (idx_qty(i1) == 3)&
+       write(*,*) i2,' shifted baryon chemical potential mu_b-m_n         [MeV]        '
+     if (idx_qty(i1) == 4)&
+       write(*,*) i2,' charge chemical potential mu_q                     [MeV]        '
+     if (idx_qty(i1) == 5)&
+       write(*,*) i2,' lepton chemical potential mu_l                     [MeV]        '
+     if (idx_qty(i1) == 6)&
+       write(*,*) i2,' scaled free energy per baryon F/m_n-1              []           '
+     if (idx_qty(i1) == 7)&
+       write(*,*) i2,' scaled internal energy per baryon E/m_n-1          []           '
+     if (idx_qty(i1) == 8)&
+       write(*,*) i2,' scaled enthalpy energy per baryon H/m_n-1          []           '
+     if (idx_qty(i1) == 9)&
+       write(*,*) i2,' scaled free enthalpy per baryon G/m_n-1            []           '
+     if (idx_qty(i1) == 10)&
+       write(*,*) i2,' derivative dp/dn_b|E                               [MeV]        '
+     if (idx_qty(i1) == 11)&
+       write(*,*) i2,' derivative p/dE|n_b                                [fm^-3]      '
+     if (idx_qty(i1) == 12)&
+       write(*,*) i2,' square of speed of sound (c_s)^2                   []           '
+     if (idx_qty(i1) == 13)&
+       write(*,*) i2,' specific heat capacity at constant volume c_V      []           '
+     if (idx_qty(i1) == 14)&
+       write(*,*) i2,' specific heat capacity at constant pressure c_p    []           '
+     if (idx_qty(i1) == 15)&
+       write(*,*) i2,' adiabatic index Gamma                              []           '
+     if (idx_qty(i1) == 16)&
+       write(*,*) i2,' expansion coefficient at constant pressure alpha_p [MeV^-1]     '
+     if (idx_qty(i1) == 17)&
+       write(*,*) i2,' tension coefficient at constant volume beta_V      [fm^-3]      '
+     if (idx_qty(i1) == 18)&
+       write(*,*) i2,' isothermal compressibility kappa_T                 [MeV^-1 fm^3]'
+     if (idx_qty(i1) == 19)&
+       write(*,*) i2,' isentropic compressibility kappa_S                 [MeV^-1 fm^3]'
+     if (idx_qty(i1) == 20)&
+       write(*,*) i2,' free energy per baryon F                           [MeV]        '
+     if (idx_qty(i1) == 21)&
+       write(*,*) i2,' internal energy per baryon E                       [MeV]        '
+     if (idx_qty(i1) == 22)&
+       write(*,*) i2,' enthalpy per baryon H                              [MeV]        '
+     if (idx_qty(i1) == 23)&
+       write(*,*) i2,' free enthalpy per baryon G                         [MeV]        '
    end do
    if (n_add > 0) then
-      do i1=1,n_add,1
-         i2 = i2+1
-         write(*,*) i2,' additional thermodynamic quantity #                    ',idx_add(i1)
-      end do
+     do i1=1,n_add,1
+       i2 = i2+1
+       write(*,*) i2,' additional thermodynamic quantity #                    ',idx_add(i1)
+     end do
    end if
-!2017/05/22
+   !2017/05/22
    if (n_df > 0) then
-      do i1=1,n_df,1
-         i2 = i2+1
-         write(*,*) i2,' derivative quantity #                                  ',idx_df(i1)
-      end do
+     do i1=1,n_df,1
+       i2 = i2+1
+       write(*,*) i2,' derivative quantity #                                  ',idx_df(i1)
+     end do
    end if
    if (n_p > 0) then
-      do i1=1,n_p,1
-         i2 = i2+1
-         write(*,*) i2,' number fraction Y of particle with index               ',idx_p(i1)
-      end do
+     do i1=1,n_p,1
+       i2 = i2+1
+       write(*,*) i2,' number fraction Y of particle with index               ',idx_p(i1)
+     end do
    end if
    if (n_q > 0) then
-      do i1=1,n_q,1
-         i2 = i2+1
-         write(*,*) i2,' total number fraction Y of particle set with index     ',idx_q(i1)
-         i2 = i2+1
-         write(*,*) i2,' average mass number A_av of particle set with index    ',idx_q(i1)
-         i2 = i2+1
-         write(*,*) i2,' average proton number Z_av of particle set with index  ',idx_q(i1)
-         i2 = i2+1
-         write(*,*) i2,' average neutron number N_av of particle set with index ',idx_q(i1)
-      end do
+     do i1=1,n_q,1
+       i2 = i2+1
+       write(*,*) i2,' total number fraction Y of particle set with index     ',idx_q(i1)
+       i2 = i2+1
+       write(*,*) i2,' average mass number A_av of particle set with index    ',idx_q(i1)
+       i2 = i2+1
+       write(*,*) i2,' average proton number Z_av of particle set with index  ',idx_q(i1)
+       i2 = i2+1
+       write(*,*) i2,' average neutron number N_av of particle set with index ',idx_q(i1)
+     end do
    end if
    if (n_m > 0) then
-      do i1=1,n_m,1
-         i2 = i2+1
-         write(*,*) i2,' microscopic quantity with index                        ',idx_m(i1)
-      end do
+     do i1=1,n_m,1
+       i2 = i2+1
+       write(*,*) i2,' microscopic quantity with index                        ',idx_m(i1)
+     end do
    end if
    if (n_err > 0) then
-      do i1=1,n_err,1
-         i2 = i2+1
-         write(*,*) i2,' error quantity with index                              ',idx_err(i1)
-      end do
+     do i1=1,n_err,1
+       i2 = i2+1
+       write(*,*) i2,' error quantity with index                              ',idx_err(i1)
+     end do
    end if
    write(*,*)
-end if
+ end if
 
-! write output on json file
-call out_to_json_write(iwr,irpl,i_beta, &
-  &                    idx_qty, idx_add, idx_df, idx_p, idx_q, idx_m, idx_err,&
-  &                    n_qty,   n_add,    n_df,  n_p,   n_q,   n_m,&
-  &                    n_err)
+ ! write output on json file
+ call out_to_json_write(iwr,irpl,i_beta, &
+   &                    idx_qty, idx_add, idx_df, idx_p, idx_q, idx_m, idx_err,&
+   &                    n_qty,   n_add,    n_df,  n_p,   n_q,   n_m,&
+   &                    n_err)
 
 
-if (allocated(tab_para)) deallocate(tab_para)
-if (allocated(idx_arg)) deallocate(idx_arg)
-if (allocated(tab_thermo)) deallocate(tab_thermo)
-if (allocated(idx_thermo)) deallocate(idx_thermo)
-if (allocated(v_thermo)) deallocate(v_thermo)
-if (allocated(eos_thermo_add)) deallocate(eos_thermo_add)
-if (allocated(idx_add)) deallocate(idx_add)
-if (allocated(idxp_compo)) deallocate(idxp_compo)
-if (allocated(idxq_compo)) deallocate(idxq_compo)
-if (allocated(tabp_compo)) deallocate(tabp_compo)
-if (allocated(tabq_compo)) deallocate(tabq_compo)
-if (allocated(idx_p)) deallocate(idx_p)
-if (allocated(idx_q)) deallocate(idx_q)
-if (allocated(idx_compo_p)) deallocate(idx_compo_p)
-if (allocated(idx_compo_q)) deallocate(idx_compo_q)
-if (allocated(eos_compo_p)) deallocate(eos_compo_p)
-if (allocated(eos_compo_q)) deallocate(eos_compo_q)
-if (allocated(eos_q)) deallocate(eos_q)
-if (allocated(idx_mic)) deallocate(idx_mic)
-if (allocated(tab_mic)) deallocate(tab_mic)
-if (allocated(idx_m)) deallocate(idx_m)
-if (allocated(idx_micro)) deallocate(idx_micro)
-if (allocated(eos_micro)) deallocate(eos_micro)
-if (allocated(idx_argx)) deallocate(idx_argx)
-if (allocated(r1d)) deallocate(r1d)
-if (allocated(r2d)) deallocate(r2d)
+ if (allocated(tab_para)) deallocate(tab_para)
+ if (allocated(idx_arg)) deallocate(idx_arg)
+ if (allocated(tab_thermo)) deallocate(tab_thermo)
+ if (allocated(idx_thermo)) deallocate(idx_thermo)
+ if (allocated(v_thermo)) deallocate(v_thermo)
+ if (allocated(eos_thermo_add)) deallocate(eos_thermo_add)
+ if (allocated(idx_add)) deallocate(idx_add)
+ if (allocated(idxp_compo)) deallocate(idxp_compo)
+ if (allocated(idxq_compo)) deallocate(idxq_compo)
+ if (allocated(tabp_compo)) deallocate(tabp_compo)
+ if (allocated(tabq_compo)) deallocate(tabq_compo)
+ if (allocated(idx_p)) deallocate(idx_p)
+ if (allocated(idx_q)) deallocate(idx_q)
+ if (allocated(idx_compo_p)) deallocate(idx_compo_p)
+ if (allocated(idx_compo_q)) deallocate(idx_compo_q)
+ if (allocated(eos_compo_p)) deallocate(eos_compo_p)
+ if (allocated(eos_compo_q)) deallocate(eos_compo_q)
+ if (allocated(eos_q)) deallocate(eos_q)
+ if (allocated(idx_mic)) deallocate(idx_mic)
+ if (allocated(tab_mic)) deallocate(tab_mic)
+ if (allocated(idx_m)) deallocate(idx_m)
+ if (allocated(idx_micro)) deallocate(idx_micro)
+ if (allocated(eos_micro)) deallocate(eos_micro)
+ if (allocated(idx_argx)) deallocate(idx_argx)
+ if (allocated(r1d)) deallocate(r1d)
+ if (allocated(r2d)) deallocate(r2d)
 
-return
+ return
 end SUBROUTINE get_eos_table
 !***********************************************************************
 SUBROUTINE get_eos(t,n,y,b,ipl,i_beta,i_entr)
@@ -4899,7 +3518,12 @@ subroutine eos_interpol_d3(m,q,ipl,inmp,ibeta,dim_ipl)
 
          vec(idx3(igp3)) = tab_thermo(j1,j2,j3,iq)
          irp = idx_arg(j1,j2,j3,ik(3))
-         ir(idx3(igp3)) = get_ipl_rule(irp,idx3(igp3),ipl(ik(3)))
+         if  (idx3(igp3) > 0) then
+           ir(idx3(igp3)) = ipl_rule(1,ipl(ik(3)),irp)
+         else
+           ir(idx3(igp3)) = ipl_rule(0,ipl(ik(3)),irp)
+           ! ir(idx3(igp3)) = get_ipl_rule(irp,idx3(igp3),ipl(ik(3)))
+         endif
        end do
        call get_interpol_x(m,q,ir,vec,dh,ipl,ik(3))
        mat(iq,idx1(igp),idx2(igp)) = dh(0)
@@ -5181,9 +3805,6 @@ subroutine eos_interpol_d3(m,q,ipl,inmp,ibeta,dim_ipl)
        end do
 
 
-       ! call get_derivatives(ipl,ik)
-       ! call get_coefficients()
-       ! call get_interpol_xy(qx,qy,dg,0)
        call make_interp_xy(ipl,ik,qx,qy,dg,0,mat(iq,-4:5,-4:5))
 
        vp_compo(iq) = dg(0,0)
@@ -5471,11 +4092,8 @@ qy = q(ik(2))
 eos_df(1:10) = 0.d00
 do iq=1,nall_max,1
    if (idx_thermo(iq) > 0) then
-     df(0,0,-4:5,-4:5) = mat(iq,-4:5,-4:5)
+      call make_interp_xy(ipl,ik,qx,qy,dg,1,mat(iq,-4:5,-4:5))
 
-      call get_derivatives(ipl,ik)
-      call get_coefficients()
-      call get_interpol_xy(qx,qy,dg,1)
       v_thermo(iq,0) = dg(0,0)
       v_thermo(iq,1) = dg(0,1)
       v_thermo(iq,2) = dg(1,0)
@@ -5750,14 +4368,7 @@ if (ibeta /= 1) then
       qx = q(ik(1))
       qy = q(ik(2))
       do iq=1,np_max,1
-         do i1=-4,5,1
-            do i2=-4,5,1
-               df(0,0,i1,i2) = mat(iq,i1,i2)
-            end do
-         end do
-         call get_derivatives(ipl,ik)
-         call get_coefficients()
-         call get_interpol_xy(qx,qy,dg,0)
+         call make_interp_xy(ipl,ik,qx,qy,dg,0,mat(iq,-4:5,-4:5))
          vp_compo(iq) = dg(0,0)
       end do
 
@@ -5811,14 +4422,7 @@ if (ibeta /= 1) then
       qy = q(ik(2))
       do iq=1,nq_max,1
          do is=1,3,1
-            do i1=-4,5,1
-               do i2=-4,5,1
-                  df(0,0,i1,i2) = mat3(iq,i1,i2,is)
-               end do
-            end do
-            call get_derivatives(ipl,ik)
-            call get_coefficients()
-            call get_interpol_xy(qx,qy,dg,0)
+            call make_interp_xy(ipl,ik,qx,qy,dg,0,mat3(iq,-4:5,-4:5,is))
             vq_compo(iq,is) = dg(0,0)
          end do
       end do
@@ -5880,14 +4484,7 @@ if (ibeta /= 1) then
       qx = q(ik(1))
       qy = q(ik(2))
       do iq=1,nm_max,1
-         do i1=-4,5,1
-            do i2=-4,5,1
-               df(0,0,i1,i2) = mat(iq,i1,i2)
-            end do
-         end do
-         call get_derivatives(ipl,ik)
-         call get_coefficients()
-         call get_interpol_xy(qx,qy,dg,0)
+         call make_interp_xy(ipl,ik,qx,qy,dg,0,mat(iq,-4:5,-4:5))
          v_micro(iq) = dg(0,0)
       end do
 
@@ -6350,18 +4947,18 @@ subroutine make_interp_xy(ipl,ik,qx,qy,dg,order,df00)
    end do
  end if
 
-! print *,dx,dy,dx2,dy2,dx*dy,dx2,dy2
+ ! print *,dx,dy,dx2,dy2,dx*dy,dx2,dy2
 
-!        print *,df(1,0,:,:)
-!        print *,df(0,1,:,:)
-!        print *,df(2,0,:,:)
-!        print *,df(0,2,:,:)
-!        print *,df(1,1,:,:)
-!        print *,df(2,1,:,:)
-!        print *,df(1,2,:,:)
-!        print *,df(2,2,:,:)
+ !        print *,df(1,0,:,:)
+ !        print *,df(0,1,:,:)
+ !        print *,df(2,0,:,:)
+ !        print *,df(0,2,:,:)
+ !        print *,df(1,1,:,:)
+ !        print *,df(2,1,:,:)
+ !        print *,df(1,2,:,:)
+ !        print *,df(2,2,:,:)
 
-!        stop
+ !        stop
 
 
 
@@ -6417,637 +5014,228 @@ subroutine make_interp_xy(ipl,ik,qx,qy,dg,order,df00)
  end if
 
 
-fc(0,0) = df(0,0,0,0)
-fc(0,1) = df(0,1,0,0)
-fc(0,2) = 0.5d00*df(0,2,0,0)
-fc(0,3) = -10.d00*(df(0,0,0,0)-df(0,0,0,1))&
-     -6.d00*df(0,1,0,0)-4.d00*df(0,1,0,1)&
-     -1.5d00*df(0,2,0,0)+0.5d00*df(0,2,0,1)
-fc(0,4) =  15.d00*(df(0,0,0,0)-df(0,0,0,1))&
-     +8.d00*df(0,1,0,0)+7.d00*df(0,1,0,1)&
-     +1.5d00*df(0,2,0,0)-1.d00*df(0,2,0,1)
-fc(0,5) =  -6.d00*(df(0,0,0,0)-df(0,0,0,1))&
-     -3.d00*(df(0,1,0,0)+df(0,1,0,1))&
-     -0.5d00*(df(0,2,0,0)-df(0,2,0,1))
-fc(1,0) = df(1,0,0,0)
-fc(1,1) = df(1,1,0,0)
-fc(1,2) = 0.5d00*df(1,2,0,0)
-fc(1,3) = -10.d00*(df(1,0,0,0)-df(1,0,0,1))&
-     -6.d00*df(1,1,0,0)-4.d00*df(1,1,0,1)&
-     -1.5d00*df(1,2,0,0)+0.5d00*df(1,2,0,1)
-fc(1,4) =  15.d00*(df(1,0,0,0)-df(1,0,0,1))&
-     +8.d00*df(1,1,0,0)+7.d00*df(1,1,0,1)&
-     +1.5d00*df(1,2,0,0)-1.d00*df(1,2,0,1)
-fc(1,5) =  -6.d00*(df(1,0,0,0)-df(1,0,0,1))&
-     -3.d00*(df(1,1,0,0)+df(1,1,0,1))&
-     -0.5d00*(df(1,2,0,0)-df(1,2,0,1))
-fc(2,0) = 0.5d00*df(2,0,0,0)
-fc(2,1) = 0.5d00*df(2,1,0,0)
-fc(2,2) = 0.25d00*df(2,2,0,0)
-fc(2,3) = -5.d00*(df(2,0,0,0)-df(2,0,0,1))&
-     -3.d00*df(2,1,0,0)-2.d00*df(2,1,0,1)&
-     -0.75d00*df(2,2,0,0)+0.25d00*df(2,2,0,1)
-fc(2,4) =  7.5d00*(df(2,0,0,0)-df(2,0,0,1))&
-     +4.d00*df(2,1,0,0)+3.5d00*df(2,1,0,1)&
-     +0.75d00*df(2,2,0,0)-0.5d00*df(2,2,0,1)
-fc(2,5) = -3.d00*(df(2,0,0,0)-df(2,0,0,1))&
-     -1.5d00*(df(2,1,0,0)+df(2,1,0,1))&
-     -0.25d00*(df(2,2,0,0)-df(2,2,0,1))
-fc(3,0) =  -10.d00*(df(0,0,0,0)-df(0,0,1,0))&
-     -6.d00*df(1,0,0,0)-4.d00*df(1,0,1,0)&
-     -1.5d00*df(2,0,0,0)+0.5d00*df(2,0,1,0)
-fc(3,1) = -10.d00*(df(0,1,0,0)-df(0,1,1,0))&
-     -6.d00*df(1,1,0,0)-4.d00*df(1,1,1,0)&
-     -1.5d00*df(2,1,0,0)+0.5d00*df(2,1,1,0)
-fc(3,2) = -5.d00*(df(0,2,0,0)-df(0,2,1,0))&
-     -3.d00*df(1,2,0,0)-2.d00*df(1,2,1,0)&
-     -0.75d00*df(2,2,0,0)+0.25d00*df(2,2,1,0)
-fc(3,3) =  100.d00*(df(0,0,0,0)-df(0,0,1,0)-df(0,0,0,1)+df(0,0,1,1))&
-     +60.d00*(df(1,0,0,0)-df(1,0,0,1))+40.d00*(df(1,0,1,0)-df(1,0,1,1))&
-     +60.d00*(df(0,1,0,0)-df(0,1,1,0))+40.d00*(df(0,1,0,1)-df(0,1,1,1))&
-     +15.d00*(df(2,0,0,0)-df(2,0,0,1))-5.d00*(df(2,0,1,0)-df(2,0,1,1))&
-     +36.d00*df(1,1,0,0)+24.d00*(df(1,1,1,0)+df(1,1,0,1))+16.d00*df(1,1,1,1)&
-     +15.d00*(df(0,2,0,0)-df(0,2,1,0))-5.d00*(df(0,2,0,1)-df(0,2,1,1))&
-     +9.d00*(df(2,1,0,0)+df(1,2,0,0))-3.d00*(df(2,1,1,0)+df(1,2,0,1))&
-     +6.d00*(df(2,1,0,1)+df(1,2,1,0))-2.d00*(df(2,1,1,1)+df(1,2,1,1))&
-     +2.25d00*df(2,2,0,0)-0.75d00*(df(2,2,1,0)+df(2,2,0,1))&
-     +0.25d00*df(2,2,1,1)
-fc(3,4) = -150.d00*(df(0,0,0,0)-df(0,0,1,0)-df(0,0,0,1)+df(0,0,1,1))&
-     -90.d00*(df(1,0,0,0)-df(1,0,0,1))-60.d00*(df(1,0,1,0)-df(1,0,1,1))&
-     -80.d00*(df(0,1,0,0)-df(0,1,1,0))-70.d00*(df(0,1,0,1)-df(0,1,1,1))&
-     -22.5d00*(df(2,0,0,0)-df(2,0,0,1))+7.5d00*(df(2,0,1,0)-df(2,0,1,1))&
-     -48.d00*df(1,1,0,0)-32.d00*df(1,1,1,0)&
-     -42.d00*df(1,1,0,1)-28.d00*df(1,1,1,1)&
-     -15.d00*(df(0,2,0,0)-df(0,2,1,0))+10.d00*(df(0,2,0,1)-df(0,2,1,1))&
-     -12.d00*df(2,1,0,0)+4.d00*df(2,1,1,0)&
-     -10.5d00*df(2,1,0,1)+3.5d00*df(2,1,1,1)&
-     -9.d00*df(1,2,0,0)-6.d00*(df(1,2,1,0)-df(1,2,0,1))+4.d00*df(1,2,1,1)&
-     -2.25d00*df(2,2,0,0)+0.75d00*df(2,2,1,0)&
-     +1.5d00*df(2,2,0,1)-0.5d00*df(2,2,1,1)
-fc(3,5) =   60.d00*(df(0,0,0,0)-df(0,0,1,0)-df(0,0,0,1)+df(0,0,1,1))&
-     +36.d00*(df(1,0,0,0)-df(1,0,0,1))+24.d00*(df(1,0,1,0)-df(1,0,1,1))&
-     +30.d00*(df(0,1,0,0)-df(0,1,1,0)+df(0,1,0,1)-df(0,1,1,1))&
-     +9.d00*(df(2,0,0,0)-df(2,0,0,1))-3.d00*(df(2,0,1,0)-df(2,0,1,1))&
-     +18.d00*(df(1,1,0,0)+df(1,1,0,1))+12.d00*(df(1,1,1,0)+df(1,1,1,1))&
-     +5.d00*(df(0,2,0,0)-df(0,2,1,0)-df(0,2,0,1)+df(0,2,1,1))&
-     +4.5d00*(df(2,1,0,0)+df(2,1,0,1))-1.5d00*(df(2,1,1,0)+df(2,1,1,1))&
-     +3.d00*(df(1,2,0,0)-df(1,2,0,1))+2.d00*(df(1,2,1,0)-df(1,2,1,1))&
-     +0.75d00*(df(2,2,0,0)-df(2,2,0,1))&
-     -0.25d00*(df(2,2,1,0)-df(2,2,1,1))
-fc(4,0) =   15.d00*(df(0,0,0,0)-df(0,0,1,0))&
-     +8.d00*df(1,0,0,0)+7.d00*df(1,0,1,0)&
-     +1.5d00*df(2,0,0,0)-1.d00*df(2,0,1,0)
-fc(4,1) = 15.d00*(df(0,1,0,0)-df(0,1,1,0))&
-     +8.d00*df(1,1,0,0)+7.d00*df(1,1,1,0)&
-     +1.5d00*df(2,1,0,0)-1.d00*df(2,1,1,0)
-fc(4,2) = 7.5d00*(df(0,2,0,0)-df(0,2,1,0))&
-     +4.d00*df(1,2,0,0)+3.5d00*df(1,2,1,0)&
-     +0.75d00*df(2,2,0,0)-0.5d00*df(2,2,1,0)
-fc(4,3) = -150.d00*(df(0,0,0,0)-df(0,0,1,0)-df(0,0,0,1)+df(0,0,1,1))&
-     -80.d00*(df(1,0,0,0)-df(1,0,0,1))-70.d00*(df(1,0,1,0)-df(1,0,1,1))&
-     -90.d00*(df(0,1,0,0)-df(0,1,1,0))-60.d00*(df(0,1,0,1)-df(0,1,1,1))&
-     -15.d00*(df(2,0,0,0)-df(2,0,0,1))+10.d00*(df(2,0,1,0)-df(2,0,1,1))&
-     -48.d00*df(1,1,0,0)-42.d00*df(1,1,1,0)&
-     -32.d00*df(1,1,0,1)-28.d00*df(1,1,1,1)&
-     -22.5d00*(df(0,2,0,0)-df(0,2,1,0))+7.5d00*(df(0,2,0,1)-df(0,2,1,1))&
-     -9.d00*df(2,1,0,0)+6.d00*(df(2,1,1,0)-df(2,1,0,1))+4.d00*df(2,1,1,1)&
-     -12.d00*df(1,2,0,0)-10.5d00*df(1,2,1,0)&
-     +4.d00*df(1,2,0,1)+3.5d00*df(1,2,1,1)&
-     -2.25d00*df(2,2,0,0)+1.5d00*df(2,2,1,0)&
-     +0.75d00*df(2,2,0,1)-0.5d00*df(2,2,1,1)
-fc(4,4) =  225.d00*(df(0,0,0,0)-df(0,0,1,0)-df(0,0,0,1)+df(0,0,1,1))&
-     +120.d00*(df(1,0,0,0)-df(1,0,0,1))+105.d00*(df(1,0,1,0)-df(1,0,1,1))&
-     +120.d00*(df(0,1,0,0)-df(0,1,1,0))+105.d00*(df(0,1,0,1)-df(0,1,1,1))&
-     +22.5d00*(df(2,0,0,0)-df(2,0,0,1))-15.d00*(df(2,0,1,0)-df(2,0,1,1))&
-     +64.d00*df(1,1,0,0)+56.d00*(df(1,1,1,0)+df(1,1,0,1))+49.d00*df(1,1,1,1)&
-     +22.5d00*(df(0,2,0,0)-df(0,2,1,0))-15.d00*(df(0,2,0,1)-df(0,2,1,1))&
-     +12.d00*(df(2,1,0,0)+df(1,2,0,0))-8.d00*(df(2,1,1,0)+df(1,2,0,1))&
-     +10.5d00*(df(2,1,0,1)+df(1,2,1,0))-7.d00*(df(2,1,1,1)+df(1,2,1,1))&
-     +2.25d00*df(2,2,0,0)-1.5d00*(df(2,2,1,0)+df(2,2,0,1))&
-     +1.d00*df(2,2,1,1)
-fc(4,5) =  -90.d00*(df(0,0,0,0)-df(0,0,1,0)-df(0,0,0,1)+df(0,0,1,1))&
-     -48.d00*(df(1,0,0,0)-df(1,0,0,1))-42.d00*(df(1,0,1,0)-df(1,0,1,1))&
-     -45.d00*(df(0,1,0,0)-df(0,1,1,0)+df(0,1,0,1)-df(0,1,1,1))&
-     -9.d00*(df(2,0,0,0)-df(2,0,0,1))+6.d00*(df(2,0,1,0)-df(2,0,1,1))&
-     -24.d00*(df(1,1,0,0)+df(1,1,0,1))-21.d00*(df(1,1,1,0)+df(1,1,1,1))&
-     -7.5d00*(df(0,2,0,0)-df(0,2,1,0)-df(0,2,0,1)+df(0,2,1,1))&
-     -4.5d00*(df(2,1,0,0)+df(2,1,0,1))+3.d00*(df(2,1,1,0)+df(2,1,1,1))&
-     -4.d00*df(1,2,0,0)-3.5d00*(df(1,2,1,0)-df(1,2,1,1))+4.d00*df(1,2,0,1)&
-     -0.75d00*(df(2,2,0,0)-df(2,2,0,1))&
-     +0.5d00*(df(2,2,1,0)-df(2,2,1,1))
-fc(5,0) =   -6.d00*(df(0,0,0,0)-df(0,0,1,0))&
-     -3.d00*(df(1,0,0,0)+df(1,0,1,0))&
-     -0.5d00*(df(2,0,0,0)-df(2,0,1,0))
-fc(5,1) = -6.d00*(df(0,1,0,0)-df(0,1,1,0))&
-     -3.d00*(df(1,1,0,0)+df(1,1,1,0))&
-     -0.5d00*(df(2,1,0,0)-df(2,1,1,0))
-fc(5,2) = -3.d00*df(0,2,0,0)+3.d00*df(0,2,1,0)&
-     -1.5d00*df(1,2,0,0)-1.5d00*df(1,2,1,0)&
-     -0.25d00*df(2,2,0,0)+0.25d00*df(2,2,1,0)
-fc(5,3) =   60.d00*(df(0,0,0,0)-df(0,0,1,0)-df(0,0,0,1)+df(0,0,1,1))&
-     +30.d00*(df(1,0,0,0)+df(1,0,1,0)-df(1,0,0,1)-df(1,0,1,1))&
-     +36.d00*(df(0,1,0,0)-df(0,1,1,0))+24.d00*(df(0,1,0,1)-df(0,1,1,1))&
-     +5.d00*(df(2,0,0,0)-df(2,0,1,0)-df(2,0,0,1)+df(2,0,1,1))&
-     +18.d00*(df(1,1,0,0)+df(1,1,1,0))+12.d00*(df(1,1,0,1)+df(1,1,1,1))&
-     +9.d00*(df(0,2,0,0)-df(0,2,1,0))-3.d00*(df(0,2,0,1)-df(0,2,1,1))&
-     +3.d00*(df(2,1,0,0)-df(2,1,1,0))+2.d00*(df(2,1,0,1)-df(2,1,1,1))&
-     +4.5d00*df(1,2,0,0)+4.5d00*df(1,2,1,0)&
-     -1.5d00*(df(1,2,0,1)+df(1,2,1,1))&
-     +0.75d00*(df(2,2,0,0)-df(2,2,1,0))&
-     -0.25d00*(df(2,2,0,1)-df(2,2,1,1))
-fc(5,4) =  -90.d00*(df(0,0,0,0)-df(0,0,1,0)-df(0,0,0,1)+df(0,0,1,1))&
-     -45.d00*(df(1,0,0,0)+df(1,0,1,0)-df(1,0,0,1)-df(1,0,1,1))&
-     -48.d00*(df(0,1,0,0)-df(0,1,1,0))-42.d00*(df(0,1,0,1)-df(0,1,1,1))&
-     -7.5d00*(df(2,0,0,0)-df(2,0,1,0)-df(2,0,0,1)+df(2,0,1,1))&
-     -24.d00*(df(1,1,0,0)+df(1,1,1,0))-21.d00*(df(1,1,0,1)+df(1,1,1,1))&
-     -9.d00*(df(0,2,0,0)-df(0,2,1,0))+6.d00*(df(0,2,0,1)-df(0,2,1,1))&
-     -4.d00*(df(2,1,0,0)-df(2,1,1,0))-3.5d00*(df(2,1,0,1)-df(2,1,1,1))&
-     -4.5d00*(df(1,2,0,0)+df(1,2,1,0))+3.d00*(df(1,2,0,1)+df(1,2,1,1))&
-     -0.75d00*(df(2,2,0,0)-df(2,2,1,0))&
-     +0.5d00*(df(2,2,0,1)-df(2,2,1,1))
-fc(5,5) =   36.d00*(df(0,0,0,0)-df(0,0,1,0)-df(0,0,0,1)+df(0,0,1,1))&
-     +18.d00*(df(1,0,0,0)+df(1,0,1,0)-df(1,0,0,1)-df(1,0,1,1))&
-     +18.d00*(df(0,1,0,0)-df(0,1,1,0)+df(0,1,0,1)-df(0,1,1,1))&
-     +3.d00*(df(2,0,0,0)-df(2,0,1,0)-df(2,0,0,1)+df(2,0,1,1))&
-     +9.d00*(df(1,1,0,0)+df(1,1,1,0)+df(1,1,0,1)+df(1,1,1,1))&
-     +3.d00*(df(0,2,0,0)-df(0,2,1,0)-df(0,2,0,1)+df(0,2,1,1))&
-     +1.5d00*(df(2,1,0,0)-df(2,1,1,0)+df(2,1,0,1)-df(2,1,1,1))&
-     +1.5d00*(df(1,2,0,0)+df(1,2,1,0)-df(1,2,0,1)-df(1,2,1,1))&
-     +0.25d00*(df(2,2,0,0)-df(2,2,1,0)-df(2,2,0,1)+df(2,2,1,1))
+ fc(0,0) = df(0,0,0,0)
+ fc(0,1) = df(0,1,0,0)
+ fc(0,2) = 0.5d00*df(0,2,0,0)
+ fc(0,3) = -10.d00*(df(0,0,0,0)-df(0,0,0,1))&
+   -6.d00*df(0,1,0,0)-4.d00*df(0,1,0,1)&
+   -1.5d00*df(0,2,0,0)+0.5d00*df(0,2,0,1)
+ fc(0,4) =  15.d00*(df(0,0,0,0)-df(0,0,0,1))&
+   +8.d00*df(0,1,0,0)+7.d00*df(0,1,0,1)&
+   +1.5d00*df(0,2,0,0)-1.d00*df(0,2,0,1)
+ fc(0,5) =  -6.d00*(df(0,0,0,0)-df(0,0,0,1))&
+   -3.d00*(df(0,1,0,0)+df(0,1,0,1))&
+   -0.5d00*(df(0,2,0,0)-df(0,2,0,1))
+ fc(1,0) = df(1,0,0,0)
+ fc(1,1) = df(1,1,0,0)
+ fc(1,2) = 0.5d00*df(1,2,0,0)
+ fc(1,3) = -10.d00*(df(1,0,0,0)-df(1,0,0,1))&
+   -6.d00*df(1,1,0,0)-4.d00*df(1,1,0,1)&
+   -1.5d00*df(1,2,0,0)+0.5d00*df(1,2,0,1)
+ fc(1,4) =  15.d00*(df(1,0,0,0)-df(1,0,0,1))&
+   +8.d00*df(1,1,0,0)+7.d00*df(1,1,0,1)&
+   +1.5d00*df(1,2,0,0)-1.d00*df(1,2,0,1)
+ fc(1,5) =  -6.d00*(df(1,0,0,0)-df(1,0,0,1))&
+   -3.d00*(df(1,1,0,0)+df(1,1,0,1))&
+   -0.5d00*(df(1,2,0,0)-df(1,2,0,1))
+ fc(2,0) = 0.5d00*df(2,0,0,0)
+ fc(2,1) = 0.5d00*df(2,1,0,0)
+ fc(2,2) = 0.25d00*df(2,2,0,0)
+ fc(2,3) = -5.d00*(df(2,0,0,0)-df(2,0,0,1))&
+   -3.d00*df(2,1,0,0)-2.d00*df(2,1,0,1)&
+   -0.75d00*df(2,2,0,0)+0.25d00*df(2,2,0,1)
+ fc(2,4) =  7.5d00*(df(2,0,0,0)-df(2,0,0,1))&
+   +4.d00*df(2,1,0,0)+3.5d00*df(2,1,0,1)&
+   +0.75d00*df(2,2,0,0)-0.5d00*df(2,2,0,1)
+ fc(2,5) = -3.d00*(df(2,0,0,0)-df(2,0,0,1))&
+   -1.5d00*(df(2,1,0,0)+df(2,1,0,1))&
+   -0.25d00*(df(2,2,0,0)-df(2,2,0,1))
+ fc(3,0) =  -10.d00*(df(0,0,0,0)-df(0,0,1,0))&
+   -6.d00*df(1,0,0,0)-4.d00*df(1,0,1,0)&
+   -1.5d00*df(2,0,0,0)+0.5d00*df(2,0,1,0)
+ fc(3,1) = -10.d00*(df(0,1,0,0)-df(0,1,1,0))&
+   -6.d00*df(1,1,0,0)-4.d00*df(1,1,1,0)&
+   -1.5d00*df(2,1,0,0)+0.5d00*df(2,1,1,0)
+ fc(3,2) = -5.d00*(df(0,2,0,0)-df(0,2,1,0))&
+   -3.d00*df(1,2,0,0)-2.d00*df(1,2,1,0)&
+   -0.75d00*df(2,2,0,0)+0.25d00*df(2,2,1,0)
+ fc(3,3) =  100.d00*(df(0,0,0,0)-df(0,0,1,0)-df(0,0,0,1)+df(0,0,1,1))&
+   +60.d00*(df(1,0,0,0)-df(1,0,0,1))+40.d00*(df(1,0,1,0)-df(1,0,1,1))&
+   +60.d00*(df(0,1,0,0)-df(0,1,1,0))+40.d00*(df(0,1,0,1)-df(0,1,1,1))&
+   +15.d00*(df(2,0,0,0)-df(2,0,0,1))-5.d00*(df(2,0,1,0)-df(2,0,1,1))&
+   +36.d00*df(1,1,0,0)+24.d00*(df(1,1,1,0)+df(1,1,0,1))+16.d00*df(1,1,1,1)&
+   +15.d00*(df(0,2,0,0)-df(0,2,1,0))-5.d00*(df(0,2,0,1)-df(0,2,1,1))&
+   +9.d00*(df(2,1,0,0)+df(1,2,0,0))-3.d00*(df(2,1,1,0)+df(1,2,0,1))&
+   +6.d00*(df(2,1,0,1)+df(1,2,1,0))-2.d00*(df(2,1,1,1)+df(1,2,1,1))&
+   +2.25d00*df(2,2,0,0)-0.75d00*(df(2,2,1,0)+df(2,2,0,1))&
+   +0.25d00*df(2,2,1,1)
+ fc(3,4) = -150.d00*(df(0,0,0,0)-df(0,0,1,0)-df(0,0,0,1)+df(0,0,1,1))&
+   -90.d00*(df(1,0,0,0)-df(1,0,0,1))-60.d00*(df(1,0,1,0)-df(1,0,1,1))&
+   -80.d00*(df(0,1,0,0)-df(0,1,1,0))-70.d00*(df(0,1,0,1)-df(0,1,1,1))&
+   -22.5d00*(df(2,0,0,0)-df(2,0,0,1))+7.5d00*(df(2,0,1,0)-df(2,0,1,1))&
+   -48.d00*df(1,1,0,0)-32.d00*df(1,1,1,0)&
+   -42.d00*df(1,1,0,1)-28.d00*df(1,1,1,1)&
+   -15.d00*(df(0,2,0,0)-df(0,2,1,0))+10.d00*(df(0,2,0,1)-df(0,2,1,1))&
+   -12.d00*df(2,1,0,0)+4.d00*df(2,1,1,0)&
+   -10.5d00*df(2,1,0,1)+3.5d00*df(2,1,1,1)&
+   -9.d00*df(1,2,0,0)-6.d00*(df(1,2,1,0)-df(1,2,0,1))+4.d00*df(1,2,1,1)&
+   -2.25d00*df(2,2,0,0)+0.75d00*df(2,2,1,0)&
+   +1.5d00*df(2,2,0,1)-0.5d00*df(2,2,1,1)
+ fc(3,5) =   60.d00*(df(0,0,0,0)-df(0,0,1,0)-df(0,0,0,1)+df(0,0,1,1))&
+   +36.d00*(df(1,0,0,0)-df(1,0,0,1))+24.d00*(df(1,0,1,0)-df(1,0,1,1))&
+   +30.d00*(df(0,1,0,0)-df(0,1,1,0)+df(0,1,0,1)-df(0,1,1,1))&
+   +9.d00*(df(2,0,0,0)-df(2,0,0,1))-3.d00*(df(2,0,1,0)-df(2,0,1,1))&
+   +18.d00*(df(1,1,0,0)+df(1,1,0,1))+12.d00*(df(1,1,1,0)+df(1,1,1,1))&
+   +5.d00*(df(0,2,0,0)-df(0,2,1,0)-df(0,2,0,1)+df(0,2,1,1))&
+   +4.5d00*(df(2,1,0,0)+df(2,1,0,1))-1.5d00*(df(2,1,1,0)+df(2,1,1,1))&
+   +3.d00*(df(1,2,0,0)-df(1,2,0,1))+2.d00*(df(1,2,1,0)-df(1,2,1,1))&
+   +0.75d00*(df(2,2,0,0)-df(2,2,0,1))&
+   -0.25d00*(df(2,2,1,0)-df(2,2,1,1))
+ fc(4,0) =   15.d00*(df(0,0,0,0)-df(0,0,1,0))&
+   +8.d00*df(1,0,0,0)+7.d00*df(1,0,1,0)&
+   +1.5d00*df(2,0,0,0)-1.d00*df(2,0,1,0)
+ fc(4,1) = 15.d00*(df(0,1,0,0)-df(0,1,1,0))&
+   +8.d00*df(1,1,0,0)+7.d00*df(1,1,1,0)&
+   +1.5d00*df(2,1,0,0)-1.d00*df(2,1,1,0)
+ fc(4,2) = 7.5d00*(df(0,2,0,0)-df(0,2,1,0))&
+   +4.d00*df(1,2,0,0)+3.5d00*df(1,2,1,0)&
+   +0.75d00*df(2,2,0,0)-0.5d00*df(2,2,1,0)
+ fc(4,3) = -150.d00*(df(0,0,0,0)-df(0,0,1,0)-df(0,0,0,1)+df(0,0,1,1))&
+   -80.d00*(df(1,0,0,0)-df(1,0,0,1))-70.d00*(df(1,0,1,0)-df(1,0,1,1))&
+   -90.d00*(df(0,1,0,0)-df(0,1,1,0))-60.d00*(df(0,1,0,1)-df(0,1,1,1))&
+   -15.d00*(df(2,0,0,0)-df(2,0,0,1))+10.d00*(df(2,0,1,0)-df(2,0,1,1))&
+   -48.d00*df(1,1,0,0)-42.d00*df(1,1,1,0)&
+   -32.d00*df(1,1,0,1)-28.d00*df(1,1,1,1)&
+   -22.5d00*(df(0,2,0,0)-df(0,2,1,0))+7.5d00*(df(0,2,0,1)-df(0,2,1,1))&
+   -9.d00*df(2,1,0,0)+6.d00*(df(2,1,1,0)-df(2,1,0,1))+4.d00*df(2,1,1,1)&
+   -12.d00*df(1,2,0,0)-10.5d00*df(1,2,1,0)&
+   +4.d00*df(1,2,0,1)+3.5d00*df(1,2,1,1)&
+   -2.25d00*df(2,2,0,0)+1.5d00*df(2,2,1,0)&
+   +0.75d00*df(2,2,0,1)-0.5d00*df(2,2,1,1)
+ fc(4,4) =  225.d00*(df(0,0,0,0)-df(0,0,1,0)-df(0,0,0,1)+df(0,0,1,1))&
+   +120.d00*(df(1,0,0,0)-df(1,0,0,1))+105.d00*(df(1,0,1,0)-df(1,0,1,1))&
+   +120.d00*(df(0,1,0,0)-df(0,1,1,0))+105.d00*(df(0,1,0,1)-df(0,1,1,1))&
+   +22.5d00*(df(2,0,0,0)-df(2,0,0,1))-15.d00*(df(2,0,1,0)-df(2,0,1,1))&
+   +64.d00*df(1,1,0,0)+56.d00*(df(1,1,1,0)+df(1,1,0,1))+49.d00*df(1,1,1,1)&
+   +22.5d00*(df(0,2,0,0)-df(0,2,1,0))-15.d00*(df(0,2,0,1)-df(0,2,1,1))&
+   +12.d00*(df(2,1,0,0)+df(1,2,0,0))-8.d00*(df(2,1,1,0)+df(1,2,0,1))&
+   +10.5d00*(df(2,1,0,1)+df(1,2,1,0))-7.d00*(df(2,1,1,1)+df(1,2,1,1))&
+   +2.25d00*df(2,2,0,0)-1.5d00*(df(2,2,1,0)+df(2,2,0,1))&
+   +1.d00*df(2,2,1,1)
+ fc(4,5) =  -90.d00*(df(0,0,0,0)-df(0,0,1,0)-df(0,0,0,1)+df(0,0,1,1))&
+   -48.d00*(df(1,0,0,0)-df(1,0,0,1))-42.d00*(df(1,0,1,0)-df(1,0,1,1))&
+   -45.d00*(df(0,1,0,0)-df(0,1,1,0)+df(0,1,0,1)-df(0,1,1,1))&
+   -9.d00*(df(2,0,0,0)-df(2,0,0,1))+6.d00*(df(2,0,1,0)-df(2,0,1,1))&
+   -24.d00*(df(1,1,0,0)+df(1,1,0,1))-21.d00*(df(1,1,1,0)+df(1,1,1,1))&
+   -7.5d00*(df(0,2,0,0)-df(0,2,1,0)-df(0,2,0,1)+df(0,2,1,1))&
+   -4.5d00*(df(2,1,0,0)+df(2,1,0,1))+3.d00*(df(2,1,1,0)+df(2,1,1,1))&
+   -4.d00*df(1,2,0,0)-3.5d00*(df(1,2,1,0)-df(1,2,1,1))+4.d00*df(1,2,0,1)&
+   -0.75d00*(df(2,2,0,0)-df(2,2,0,1))&
+   +0.5d00*(df(2,2,1,0)-df(2,2,1,1))
+ fc(5,0) =   -6.d00*(df(0,0,0,0)-df(0,0,1,0))&
+   -3.d00*(df(1,0,0,0)+df(1,0,1,0))&
+   -0.5d00*(df(2,0,0,0)-df(2,0,1,0))
+ fc(5,1) = -6.d00*(df(0,1,0,0)-df(0,1,1,0))&
+   -3.d00*(df(1,1,0,0)+df(1,1,1,0))&
+   -0.5d00*(df(2,1,0,0)-df(2,1,1,0))
+ fc(5,2) = -3.d00*df(0,2,0,0)+3.d00*df(0,2,1,0)&
+   -1.5d00*df(1,2,0,0)-1.5d00*df(1,2,1,0)&
+   -0.25d00*df(2,2,0,0)+0.25d00*df(2,2,1,0)
+ fc(5,3) =   60.d00*(df(0,0,0,0)-df(0,0,1,0)-df(0,0,0,1)+df(0,0,1,1))&
+   +30.d00*(df(1,0,0,0)+df(1,0,1,0)-df(1,0,0,1)-df(1,0,1,1))&
+   +36.d00*(df(0,1,0,0)-df(0,1,1,0))+24.d00*(df(0,1,0,1)-df(0,1,1,1))&
+   +5.d00*(df(2,0,0,0)-df(2,0,1,0)-df(2,0,0,1)+df(2,0,1,1))&
+   +18.d00*(df(1,1,0,0)+df(1,1,1,0))+12.d00*(df(1,1,0,1)+df(1,1,1,1))&
+   +9.d00*(df(0,2,0,0)-df(0,2,1,0))-3.d00*(df(0,2,0,1)-df(0,2,1,1))&
+   +3.d00*(df(2,1,0,0)-df(2,1,1,0))+2.d00*(df(2,1,0,1)-df(2,1,1,1))&
+   +4.5d00*df(1,2,0,0)+4.5d00*df(1,2,1,0)&
+   -1.5d00*(df(1,2,0,1)+df(1,2,1,1))&
+   +0.75d00*(df(2,2,0,0)-df(2,2,1,0))&
+   -0.25d00*(df(2,2,0,1)-df(2,2,1,1))
+ fc(5,4) =  -90.d00*(df(0,0,0,0)-df(0,0,1,0)-df(0,0,0,1)+df(0,0,1,1))&
+   -45.d00*(df(1,0,0,0)+df(1,0,1,0)-df(1,0,0,1)-df(1,0,1,1))&
+   -48.d00*(df(0,1,0,0)-df(0,1,1,0))-42.d00*(df(0,1,0,1)-df(0,1,1,1))&
+   -7.5d00*(df(2,0,0,0)-df(2,0,1,0)-df(2,0,0,1)+df(2,0,1,1))&
+   -24.d00*(df(1,1,0,0)+df(1,1,1,0))-21.d00*(df(1,1,0,1)+df(1,1,1,1))&
+   -9.d00*(df(0,2,0,0)-df(0,2,1,0))+6.d00*(df(0,2,0,1)-df(0,2,1,1))&
+   -4.d00*(df(2,1,0,0)-df(2,1,1,0))-3.5d00*(df(2,1,0,1)-df(2,1,1,1))&
+   -4.5d00*(df(1,2,0,0)+df(1,2,1,0))+3.d00*(df(1,2,0,1)+df(1,2,1,1))&
+   -0.75d00*(df(2,2,0,0)-df(2,2,1,0))&
+   +0.5d00*(df(2,2,0,1)-df(2,2,1,1))
+ fc(5,5) =   36.d00*(df(0,0,0,0)-df(0,0,1,0)-df(0,0,0,1)+df(0,0,1,1))&
+   +18.d00*(df(1,0,0,0)+df(1,0,1,0)-df(1,0,0,1)-df(1,0,1,1))&
+   +18.d00*(df(0,1,0,0)-df(0,1,1,0)+df(0,1,0,1)-df(0,1,1,1))&
+   +3.d00*(df(2,0,0,0)-df(2,0,1,0)-df(2,0,0,1)+df(2,0,1,1))&
+   +9.d00*(df(1,1,0,0)+df(1,1,1,0)+df(1,1,0,1)+df(1,1,1,1))&
+   +3.d00*(df(0,2,0,0)-df(0,2,1,0)-df(0,2,0,1)+df(0,2,1,1))&
+   +1.5d00*(df(2,1,0,0)-df(2,1,1,0)+df(2,1,0,1)-df(2,1,1,1))&
+   +1.5d00*(df(1,2,0,0)+df(1,2,1,0)-df(1,2,0,1)-df(1,2,1,1))&
+   +0.25d00*(df(2,2,0,0)-df(2,2,1,0)-df(2,2,0,1)+df(2,2,1,1))
 
 
 
 
-xx(-2:-1) = 0.d00
-yy(-2:-1) = 0.d00
-xx(0) = 1.d00
-yy(0) = 1.d00
-do ix=1,5,1
+ xx(-2:-1) = 0.d00
+ yy(-2:-1) = 0.d00
+ xx(0) = 1.d00
+ yy(0) = 1.d00
+ do ix=1,5,1
    xx(ix) = xx(ix-1)*qx
    yy(ix) = yy(ix-1)*qy
-end do
+ end do
 
-dg(0:2,0:2) = 0.d00
+ dg(0:2,0:2) = 0.d00
 
-if (order == 0) then
+ if (order == 0) then
    ! function
    do ix=0,5,1
-      do iy=0,5,1
-         dg(0,0) = dg(0,0)+fc(ix,iy)*xx(ix)*yy(iy)
-      end do
+     do iy=0,5,1
+       dg(0,0) = dg(0,0)+fc(ix,iy)*xx(ix)*yy(iy)
+     end do
    end do
-else
+ else
    ! function and derivatives
    do ix=0,5,1
-      do iy=0,5,1
-         dg(0,0) = dg(0,0)+fc(ix,iy)*xx(ix)*yy(iy)
-         dg(1,0) = dg(1,0)+fc(ix,iy)*xx(ix-1)*yy(iy)*dble(ix)
-         dg(0,1) = dg(0,1)+fc(ix,iy)*xx(ix)*yy(iy-1)*dble(iy)
-         dg(2,0) = dg(2,0)+fc(ix,iy)*xx(ix-2)*yy(iy)*dble(ix*(ix-1))
-         dg(1,1) = dg(1,1)+fc(ix,iy)*xx(ix-1)*yy(iy-1)*dble(iy*ix)
-         dg(0,2) = dg(0,2)+fc(ix,iy)*xx(ix)*yy(iy-2)*dble(iy*(iy-1))
-         dg(2,1) = dg(2,1)+fc(ix,iy)*xx(ix-2)*yy(iy-1)*dble(ix*(ix-1)*iy)
-         dg(1,2) = dg(1,2)+fc(ix,iy)*xx(ix-1)*yy(iy-2)*dble(ix*iy*(iy-1))
-         dg(2,2) = dg(2,2)+fc(ix,iy)*xx(ix-2)*yy(iy-2)*&
-              dble(ix*(ix-1)*iy*(iy-1))
-      end do
+     do iy=0,5,1
+       dg(0,0) = dg(0,0)+fc(ix,iy)*xx(ix)*yy(iy)
+       dg(1,0) = dg(1,0)+fc(ix,iy)*xx(ix-1)*yy(iy)*dble(ix)
+       dg(0,1) = dg(0,1)+fc(ix,iy)*xx(ix)*yy(iy-1)*dble(iy)
+       dg(2,0) = dg(2,0)+fc(ix,iy)*xx(ix-2)*yy(iy)*dble(ix*(ix-1))
+       dg(1,1) = dg(1,1)+fc(ix,iy)*xx(ix-1)*yy(iy-1)*dble(iy*ix)
+       dg(0,2) = dg(0,2)+fc(ix,iy)*xx(ix)*yy(iy-2)*dble(iy*(iy-1))
+       dg(2,1) = dg(2,1)+fc(ix,iy)*xx(ix-2)*yy(iy-1)*dble(ix*(ix-1)*iy)
+       dg(1,2) = dg(1,2)+fc(ix,iy)*xx(ix-1)*yy(iy-2)*dble(ix*iy*(iy-1))
+       dg(2,2) = dg(2,2)+fc(ix,iy)*xx(ix-2)*yy(iy-2)*&
+         dble(ix*(ix-1)*iy*(iy-1))
+     end do
    end do
 
    ! rescaling
    if (dx > 0.d00) then
-      dg(1,0) = dg(1,0)/dx
-      dg(2,0) = dg(2,0)/dx**2
+     dg(1,0) = dg(1,0)/dx
+     dg(2,0) = dg(2,0)/dx**2
    end if
    if (dy > 0.d00) then
-      dg(0,1) = dg(0,1)/dy
-      dg(0,2) = dg(0,2)/dy**2
+     dg(0,1) = dg(0,1)/dy
+     dg(0,2) = dg(0,2)/dy**2
    end if
    if ((dx > 0.d00).and.(dy > 0.)) then
-      dg(1,1) = dg(1,1)/(dx*dy)
-      dg(2,1) = dg(2,1)/((dx**2)*dy)
-      dg(1,2) = dg(1,2)/(dx*(dy**2))
-      dg(2,2) = dg(2,2)/(dx*dy)**2
+     dg(1,1) = dg(1,1)/(dx*dy)
+     dg(2,1) = dg(2,1)/((dx**2)*dy)
+     dg(1,2) = dg(1,2)/(dx*(dy**2))
+     dg(2,2) = dg(2,2)/(dx*dy)**2
    end if
-end if
+ end if
 
 end subroutine make_interp_xy
 
-SUBROUTINE get_derivatives(ipl,ik)
-! Stefan Typel for the CompOSE core team, version 1.05, 2017/10/09
-USE compose_internal
-implicit none
-integer :: i1,i2,i1p,i2p,iq,ipl(3),ik(3)
-double precision :: tmp
-
-
-!2017/10/09 (sic!)
-df(1:2,0:2,-4:5,-4:5) = 0.d00
-df(0:2,1:2,-4:5,-4:5) = 0.d00
-
-do i2=-4,5,1
-  do i1=-4,5,1
-      ! first derivatives
-      ! x
-      do iq=-4,4,1
-         i1p = i1+iq
-         if ((i1p >= -4).and.(i1p <= 5)) then
-            df(1,0,i1,i2) = df(1,0,i1,i2)+df(0,0,i1p,i2)*d1x(i1,i2,iq)
-         end if
-      end do
-      ! y
-      do iq=-4,4,1
-         i2p = i2+iq
-         if ((i2p >= -4).and.(i2p <= 5)) then
-            df(0,1,i1,i2) = df(0,1,i1,i2)+df(0,0,i1,i2p)*d1y(i1,i2,iq)
-         end if
-      end do
-      ! second derivatives
-      ! xx
-      do iq=-4,4,1
-         i1p = i1+iq
-         if ((i1p >= -4).and.(i1p <= 5)) then
-            df(2,0,i1,i2) = df(2,0,i1,i2)+df(0,0,i1p,i2)*d2x(i1,i2,iq)
-         end if
-      end do
-      ! yy
-      do iq=-4,4,1
-         i2p = i2+iq
-         if ((i2p >= -4).and.(i2p <= 5)) then
-            df(0,2,i1,i2) = df(0,2,i1,i2)+df(0,0,i1,i2p)*d2y(i1,i2,iq)
-         end if
-      end do
-   end do
-end do
-
-
-! mixed derivatives
-do i2=0,1,1
-  do i1=0,1,1
-      ! second derivatives
-      ! xy
-      do iq=-4,4,1
-         i1p = i1+iq
-         if ((i1p >= -4).and.(i1p <= 5)) then
-            df(1,1,i1,i2) = df(1,1,i1,i2)+df(0,1,i1p,i2)*d1x(i1,i2,iq)
-         end if
-      end do
-      do iq=-4,4,1
-         i2p = i2+iq
-         if ((i2p >= -4).and.(i2p <= 5)) then
-            df(1,1,i1,i2) = df(1,1,i1,i2)+df(1,0,i1,i2p)*d1y(i1,i2,iq)
-         end if
-      end do
-      df(1,1,i1,i2) = 0.5d00*df(1,1,i1,i2)
-      ! third derivatives
-      ! xxy
-      do iq=-4,4,1
-         i2p = i2+iq
-         if ((i2p >= -4).and.(i2p <= 5)) then
-            df(2,1,i1,i2) = df(2,1,i1,i2)+df(2,0,i1,i2p)*d1y(i1,i2,iq)
-         end if
-      end do
-      ! xyy
-      do iq=-4,4,1
-         i1p = i1+iq
-         if ((i1p >= -4).and.(i1p <= 5)) then
-            df(1,2,i1,i2) = df(1,2,i1,i2)+df(0,2,i1p,i2)*d1x(i1,i2,iq)
-         end if
-      end do
-      ! fourth derivative
-      ! xxyy
-      do iq=-4,4,1
-         i1p = i1+iq
-         if ((i1p >= -4).and.(i1p <= 5)) then
-            df(2,2,i1,i2) = df(2,2,i1,i2)+df(0,2,i1p,i2)*d2x(i1,i2,iq)
-         end if
-      end do
-      do iq=-4,4,1
-         i2p = i2+iq
-         if ((i2p >= -4).and.(i2p <= 5)) then
-            df(2,2,i1,i2) = df(2,2,i1,i2)+df(2,0,i1,i2p)*d2y(i1,i2,iq)
-         end if
-      end do
-      df(2,2,i1,i2) = 0.5d00*df(2,2,i1,i2)
-   end do
-end do
-
-! rescaling
-if (1 == 1) then
-  do i2=0,1,1
-    do i1=0,1,1
-      df(1,0,i1,i2) = df(1,0,i1,i2)*dx
-      df(0,1,i1,i2) = df(0,1,i1,i2)*dy
-      df(2,0,i1,i2) = df(2,0,i1,i2)*dx2
-      df(0,2,i1,i2) = df(0,2,i1,i2)*dy2
-      df(1,1,i1,i2) = df(1,1,i1,i2)*dx*dy
-      df(2,1,i1,i2) = df(2,1,i1,i2)*dx2*dy
-      df(1,2,i1,i2) = df(1,2,i1,i2)*dx*dy2
-      df(2,2,i1,i2) = df(2,2,i1,i2)*dx2*dy2
-    end do
-  end do
-end if
-
-! print *,dx,dy,dx2,dy2,dx*dy,dx2,dy2
-!        print *,df(1,0,:,:)
-!        print *,df(0,1,:,:)
-!        print *,df(2,0,:,:)
-!        print *,df(0,2,:,:)
-!        print *,df(1,1,:,:)
-!        print *,df(2,1,:,:)
-!        print *,df(1,2,:,:)
-!        print *,df(2,2,:,:)
-
-!        stop
-
-
-!???
-if (0 == 1) then
-if (ipl(ik(2)) == 2) then
-   do i2=0,2,1
-      do i1=0,1,1
-         tmp = 6.d00*(df(i2,0,i1,1)-df(i2,0,i1,0))
-         df(i2,2,i1,0) = tmp-2.d00*df(i2,1,i1,1)-4.d00*df(i2,1,i1,0)
-         df(i2,2,i1,1) = 4.d00*df(i2,1,i1,1)+2.d00*df(i2,1,i1,0)-tmp
-      end do
-   end do
-end if
-
-if (ipl(ik(1)) == 2) then
-  do i1=0,1,1
-    do i2=0,2,1
-      tmp = 6.d00*(df(0,i2,1,i1)-df(0,i2,0,i1))
-      df(2,i2,0,i1) = tmp-2.d00*df(1,i2,1,i1)-4.d00*df(1,i2,0,i1)
-      df(2,i2,1,i1) = 4.d00*df(1,i2,1,i1)+2.d00*df(1,i2,0,i1)-tmp
-    end do
-  end do
-end if
-
-if (ipl(ik(2)) == 1) then
-!2016/10/28
-   df(0:2,2,0:1,0) = 0.d00
-   df(0:2,2,0:1,1) = 0.d00
-   do i1=0,1,1
-      do i2=0,2,1
-         tmp = df(i2,0,i1,1)-df(i2,0,i1,0)
-         df(i2,1,i1,0) = tmp
-         df(i2,1,i1,1) = tmp
-!         df(i2,2,i1,0) = 0.d00
-!         df(i2,2,i1,1) = 0.d00
-      end do
-   end do
-end if
-
-if (ipl(ik(1)) == 1) then
-!2016/10/28
-   df(2,0:2,0,0:1) = 0.d00
-   df(2,0:2,1,0:1) = 0.d00
-   do i1=0,1,1
-      do i2=0,2,1
-         tmp = df(0,i2,1,i1)-df(0,i2,0,i1)
-         df(1,i2,0,i1) = tmp
-         df(1,i2,1,i1) = tmp
-      end do
-   end do
-end if
-end if
-
-
-return
-end SUBROUTINE get_derivatives
-!***********************************************************************
-SUBROUTINE get_coefficients()
-! Stefan Typel for the CompOSE core team, version 0.04, 2016/06/20
-USE compose_internal
-implicit none
-
-fc(0,0) = df(0,0,0,0)
-fc(0,1) = df(0,1,0,0)
-fc(0,2) = 0.5d00*df(0,2,0,0)
-fc(0,3) = -10.d00*(df(0,0,0,0)-df(0,0,0,1))&
-     -6.d00*df(0,1,0,0)-4.d00*df(0,1,0,1)&
-     -1.5d00*df(0,2,0,0)+0.5d00*df(0,2,0,1)
-fc(0,4) =  15.d00*(df(0,0,0,0)-df(0,0,0,1))&
-     +8.d00*df(0,1,0,0)+7.d00*df(0,1,0,1)&
-     +1.5d00*df(0,2,0,0)-1.d00*df(0,2,0,1)
-fc(0,5) =  -6.d00*(df(0,0,0,0)-df(0,0,0,1))&
-     -3.d00*(df(0,1,0,0)+df(0,1,0,1))&
-     -0.5d00*(df(0,2,0,0)-df(0,2,0,1))
-fc(1,0) = df(1,0,0,0)
-fc(1,1) = df(1,1,0,0)
-fc(1,2) = 0.5d00*df(1,2,0,0)
-fc(1,3) = -10.d00*(df(1,0,0,0)-df(1,0,0,1))&
-     -6.d00*df(1,1,0,0)-4.d00*df(1,1,0,1)&
-     -1.5d00*df(1,2,0,0)+0.5d00*df(1,2,0,1)
-fc(1,4) =  15.d00*(df(1,0,0,0)-df(1,0,0,1))&
-     +8.d00*df(1,1,0,0)+7.d00*df(1,1,0,1)&
-     +1.5d00*df(1,2,0,0)-1.d00*df(1,2,0,1)
-fc(1,5) =  -6.d00*(df(1,0,0,0)-df(1,0,0,1))&
-     -3.d00*(df(1,1,0,0)+df(1,1,0,1))&
-     -0.5d00*(df(1,2,0,0)-df(1,2,0,1))
-fc(2,0) = 0.5d00*df(2,0,0,0)
-fc(2,1) = 0.5d00*df(2,1,0,0)
-fc(2,2) = 0.25d00*df(2,2,0,0)
-fc(2,3) = -5.d00*(df(2,0,0,0)-df(2,0,0,1))&
-     -3.d00*df(2,1,0,0)-2.d00*df(2,1,0,1)&
-     -0.75d00*df(2,2,0,0)+0.25d00*df(2,2,0,1)
-fc(2,4) =  7.5d00*(df(2,0,0,0)-df(2,0,0,1))&
-     +4.d00*df(2,1,0,0)+3.5d00*df(2,1,0,1)&
-     +0.75d00*df(2,2,0,0)-0.5d00*df(2,2,0,1)
-fc(2,5) = -3.d00*(df(2,0,0,0)-df(2,0,0,1))&
-     -1.5d00*(df(2,1,0,0)+df(2,1,0,1))&
-     -0.25d00*(df(2,2,0,0)-df(2,2,0,1))
-fc(3,0) =  -10.d00*(df(0,0,0,0)-df(0,0,1,0))&
-     -6.d00*df(1,0,0,0)-4.d00*df(1,0,1,0)&
-     -1.5d00*df(2,0,0,0)+0.5d00*df(2,0,1,0)
-fc(3,1) = -10.d00*(df(0,1,0,0)-df(0,1,1,0))&
-     -6.d00*df(1,1,0,0)-4.d00*df(1,1,1,0)&
-     -1.5d00*df(2,1,0,0)+0.5d00*df(2,1,1,0)
-fc(3,2) = -5.d00*(df(0,2,0,0)-df(0,2,1,0))&
-     -3.d00*df(1,2,0,0)-2.d00*df(1,2,1,0)&
-     -0.75d00*df(2,2,0,0)+0.25d00*df(2,2,1,0)
-fc(3,3) =  100.d00*(df(0,0,0,0)-df(0,0,1,0)-df(0,0,0,1)+df(0,0,1,1))&
-     +60.d00*(df(1,0,0,0)-df(1,0,0,1))+40.d00*(df(1,0,1,0)-df(1,0,1,1))&
-     +60.d00*(df(0,1,0,0)-df(0,1,1,0))+40.d00*(df(0,1,0,1)-df(0,1,1,1))&
-     +15.d00*(df(2,0,0,0)-df(2,0,0,1))-5.d00*(df(2,0,1,0)-df(2,0,1,1))&
-     +36.d00*df(1,1,0,0)+24.d00*(df(1,1,1,0)+df(1,1,0,1))+16.d00*df(1,1,1,1)&
-     +15.d00*(df(0,2,0,0)-df(0,2,1,0))-5.d00*(df(0,2,0,1)-df(0,2,1,1))&
-     +9.d00*(df(2,1,0,0)+df(1,2,0,0))-3.d00*(df(2,1,1,0)+df(1,2,0,1))&
-     +6.d00*(df(2,1,0,1)+df(1,2,1,0))-2.d00*(df(2,1,1,1)+df(1,2,1,1))&
-     +2.25d00*df(2,2,0,0)-0.75d00*(df(2,2,1,0)+df(2,2,0,1))&
-     +0.25d00*df(2,2,1,1)
-fc(3,4) = -150.d00*(df(0,0,0,0)-df(0,0,1,0)-df(0,0,0,1)+df(0,0,1,1))&
-     -90.d00*(df(1,0,0,0)-df(1,0,0,1))-60.d00*(df(1,0,1,0)-df(1,0,1,1))&
-     -80.d00*(df(0,1,0,0)-df(0,1,1,0))-70.d00*(df(0,1,0,1)-df(0,1,1,1))&
-     -22.5d00*(df(2,0,0,0)-df(2,0,0,1))+7.5d00*(df(2,0,1,0)-df(2,0,1,1))&
-     -48.d00*df(1,1,0,0)-32.d00*df(1,1,1,0)&
-     -42.d00*df(1,1,0,1)-28.d00*df(1,1,1,1)&
-     -15.d00*(df(0,2,0,0)-df(0,2,1,0))+10.d00*(df(0,2,0,1)-df(0,2,1,1))&
-     -12.d00*df(2,1,0,0)+4.d00*df(2,1,1,0)&
-     -10.5d00*df(2,1,0,1)+3.5d00*df(2,1,1,1)&
-     -9.d00*df(1,2,0,0)-6.d00*(df(1,2,1,0)-df(1,2,0,1))+4.d00*df(1,2,1,1)&
-     -2.25d00*df(2,2,0,0)+0.75d00*df(2,2,1,0)&
-     +1.5d00*df(2,2,0,1)-0.5d00*df(2,2,1,1)
-fc(3,5) =   60.d00*(df(0,0,0,0)-df(0,0,1,0)-df(0,0,0,1)+df(0,0,1,1))&
-     +36.d00*(df(1,0,0,0)-df(1,0,0,1))+24.d00*(df(1,0,1,0)-df(1,0,1,1))&
-     +30.d00*(df(0,1,0,0)-df(0,1,1,0)+df(0,1,0,1)-df(0,1,1,1))&
-     +9.d00*(df(2,0,0,0)-df(2,0,0,1))-3.d00*(df(2,0,1,0)-df(2,0,1,1))&
-     +18.d00*(df(1,1,0,0)+df(1,1,0,1))+12.d00*(df(1,1,1,0)+df(1,1,1,1))&
-     +5.d00*(df(0,2,0,0)-df(0,2,1,0)-df(0,2,0,1)+df(0,2,1,1))&
-     +4.5d00*(df(2,1,0,0)+df(2,1,0,1))-1.5d00*(df(2,1,1,0)+df(2,1,1,1))&
-     +3.d00*(df(1,2,0,0)-df(1,2,0,1))+2.d00*(df(1,2,1,0)-df(1,2,1,1))&
-     +0.75d00*(df(2,2,0,0)-df(2,2,0,1))&
-     -0.25d00*(df(2,2,1,0)-df(2,2,1,1))
-fc(4,0) =   15.d00*(df(0,0,0,0)-df(0,0,1,0))&
-     +8.d00*df(1,0,0,0)+7.d00*df(1,0,1,0)&
-     +1.5d00*df(2,0,0,0)-1.d00*df(2,0,1,0)
-fc(4,1) = 15.d00*(df(0,1,0,0)-df(0,1,1,0))&
-     +8.d00*df(1,1,0,0)+7.d00*df(1,1,1,0)&
-     +1.5d00*df(2,1,0,0)-1.d00*df(2,1,1,0)
-fc(4,2) = 7.5d00*(df(0,2,0,0)-df(0,2,1,0))&
-     +4.d00*df(1,2,0,0)+3.5d00*df(1,2,1,0)&
-     +0.75d00*df(2,2,0,0)-0.5d00*df(2,2,1,0)
-fc(4,3) = -150.d00*(df(0,0,0,0)-df(0,0,1,0)-df(0,0,0,1)+df(0,0,1,1))&
-     -80.d00*(df(1,0,0,0)-df(1,0,0,1))-70.d00*(df(1,0,1,0)-df(1,0,1,1))&
-     -90.d00*(df(0,1,0,0)-df(0,1,1,0))-60.d00*(df(0,1,0,1)-df(0,1,1,1))&
-     -15.d00*(df(2,0,0,0)-df(2,0,0,1))+10.d00*(df(2,0,1,0)-df(2,0,1,1))&
-     -48.d00*df(1,1,0,0)-42.d00*df(1,1,1,0)&
-     -32.d00*df(1,1,0,1)-28.d00*df(1,1,1,1)&
-     -22.5d00*(df(0,2,0,0)-df(0,2,1,0))+7.5d00*(df(0,2,0,1)-df(0,2,1,1))&
-     -9.d00*df(2,1,0,0)+6.d00*(df(2,1,1,0)-df(2,1,0,1))+4.d00*df(2,1,1,1)&
-     -12.d00*df(1,2,0,0)-10.5d00*df(1,2,1,0)&
-     +4.d00*df(1,2,0,1)+3.5d00*df(1,2,1,1)&
-     -2.25d00*df(2,2,0,0)+1.5d00*df(2,2,1,0)&
-     +0.75d00*df(2,2,0,1)-0.5d00*df(2,2,1,1)
-fc(4,4) =  225.d00*(df(0,0,0,0)-df(0,0,1,0)-df(0,0,0,1)+df(0,0,1,1))&
-     +120.d00*(df(1,0,0,0)-df(1,0,0,1))+105.d00*(df(1,0,1,0)-df(1,0,1,1))&
-     +120.d00*(df(0,1,0,0)-df(0,1,1,0))+105.d00*(df(0,1,0,1)-df(0,1,1,1))&
-     +22.5d00*(df(2,0,0,0)-df(2,0,0,1))-15.d00*(df(2,0,1,0)-df(2,0,1,1))&
-     +64.d00*df(1,1,0,0)+56.d00*(df(1,1,1,0)+df(1,1,0,1))+49.d00*df(1,1,1,1)&
-     +22.5d00*(df(0,2,0,0)-df(0,2,1,0))-15.d00*(df(0,2,0,1)-df(0,2,1,1))&
-     +12.d00*(df(2,1,0,0)+df(1,2,0,0))-8.d00*(df(2,1,1,0)+df(1,2,0,1))&
-     +10.5d00*(df(2,1,0,1)+df(1,2,1,0))-7.d00*(df(2,1,1,1)+df(1,2,1,1))&
-     +2.25d00*df(2,2,0,0)-1.5d00*(df(2,2,1,0)+df(2,2,0,1))&
-     +1.d00*df(2,2,1,1)
-fc(4,5) =  -90.d00*(df(0,0,0,0)-df(0,0,1,0)-df(0,0,0,1)+df(0,0,1,1))&
-     -48.d00*(df(1,0,0,0)-df(1,0,0,1))-42.d00*(df(1,0,1,0)-df(1,0,1,1))&
-     -45.d00*(df(0,1,0,0)-df(0,1,1,0)+df(0,1,0,1)-df(0,1,1,1))&
-     -9.d00*(df(2,0,0,0)-df(2,0,0,1))+6.d00*(df(2,0,1,0)-df(2,0,1,1))&
-     -24.d00*(df(1,1,0,0)+df(1,1,0,1))-21.d00*(df(1,1,1,0)+df(1,1,1,1))&
-     -7.5d00*(df(0,2,0,0)-df(0,2,1,0)-df(0,2,0,1)+df(0,2,1,1))&
-     -4.5d00*(df(2,1,0,0)+df(2,1,0,1))+3.d00*(df(2,1,1,0)+df(2,1,1,1))&
-     -4.d00*df(1,2,0,0)-3.5d00*(df(1,2,1,0)-df(1,2,1,1))+4.d00*df(1,2,0,1)&
-     -0.75d00*(df(2,2,0,0)-df(2,2,0,1))&
-     +0.5d00*(df(2,2,1,0)-df(2,2,1,1))
-fc(5,0) =   -6.d00*(df(0,0,0,0)-df(0,0,1,0))&
-     -3.d00*(df(1,0,0,0)+df(1,0,1,0))&
-     -0.5d00*(df(2,0,0,0)-df(2,0,1,0))
-fc(5,1) = -6.d00*(df(0,1,0,0)-df(0,1,1,0))&
-     -3.d00*(df(1,1,0,0)+df(1,1,1,0))&
-     -0.5d00*(df(2,1,0,0)-df(2,1,1,0))
-fc(5,2) = -3.d00*df(0,2,0,0)+3.d00*df(0,2,1,0)&
-     -1.5d00*df(1,2,0,0)-1.5d00*df(1,2,1,0)&
-     -0.25d00*df(2,2,0,0)+0.25d00*df(2,2,1,0)
-fc(5,3) =   60.d00*(df(0,0,0,0)-df(0,0,1,0)-df(0,0,0,1)+df(0,0,1,1))&
-     +30.d00*(df(1,0,0,0)+df(1,0,1,0)-df(1,0,0,1)-df(1,0,1,1))&
-     +36.d00*(df(0,1,0,0)-df(0,1,1,0))+24.d00*(df(0,1,0,1)-df(0,1,1,1))&
-     +5.d00*(df(2,0,0,0)-df(2,0,1,0)-df(2,0,0,1)+df(2,0,1,1))&
-     +18.d00*(df(1,1,0,0)+df(1,1,1,0))+12.d00*(df(1,1,0,1)+df(1,1,1,1))&
-     +9.d00*(df(0,2,0,0)-df(0,2,1,0))-3.d00*(df(0,2,0,1)-df(0,2,1,1))&
-     +3.d00*(df(2,1,0,0)-df(2,1,1,0))+2.d00*(df(2,1,0,1)-df(2,1,1,1))&
-     +4.5d00*df(1,2,0,0)+4.5d00*df(1,2,1,0)&
-     -1.5d00*(df(1,2,0,1)+df(1,2,1,1))&
-     +0.75d00*(df(2,2,0,0)-df(2,2,1,0))&
-     -0.25d00*(df(2,2,0,1)-df(2,2,1,1))
-fc(5,4) =  -90.d00*(df(0,0,0,0)-df(0,0,1,0)-df(0,0,0,1)+df(0,0,1,1))&
-     -45.d00*(df(1,0,0,0)+df(1,0,1,0)-df(1,0,0,1)-df(1,0,1,1))&
-     -48.d00*(df(0,1,0,0)-df(0,1,1,0))-42.d00*(df(0,1,0,1)-df(0,1,1,1))&
-     -7.5d00*(df(2,0,0,0)-df(2,0,1,0)-df(2,0,0,1)+df(2,0,1,1))&
-     -24.d00*(df(1,1,0,0)+df(1,1,1,0))-21.d00*(df(1,1,0,1)+df(1,1,1,1))&
-     -9.d00*(df(0,2,0,0)-df(0,2,1,0))+6.d00*(df(0,2,0,1)-df(0,2,1,1))&
-     -4.d00*(df(2,1,0,0)-df(2,1,1,0))-3.5d00*(df(2,1,0,1)-df(2,1,1,1))&
-     -4.5d00*(df(1,2,0,0)+df(1,2,1,0))+3.d00*(df(1,2,0,1)+df(1,2,1,1))&
-     -0.75d00*(df(2,2,0,0)-df(2,2,1,0))&
-     +0.5d00*(df(2,2,0,1)-df(2,2,1,1))
-fc(5,5) =   36.d00*(df(0,0,0,0)-df(0,0,1,0)-df(0,0,0,1)+df(0,0,1,1))&
-     +18.d00*(df(1,0,0,0)+df(1,0,1,0)-df(1,0,0,1)-df(1,0,1,1))&
-     +18.d00*(df(0,1,0,0)-df(0,1,1,0)+df(0,1,0,1)-df(0,1,1,1))&
-     +3.d00*(df(2,0,0,0)-df(2,0,1,0)-df(2,0,0,1)+df(2,0,1,1))&
-     +9.d00*(df(1,1,0,0)+df(1,1,1,0)+df(1,1,0,1)+df(1,1,1,1))&
-     +3.d00*(df(0,2,0,0)-df(0,2,1,0)-df(0,2,0,1)+df(0,2,1,1))&
-     +1.5d00*(df(2,1,0,0)-df(2,1,1,0)+df(2,1,0,1)-df(2,1,1,1))&
-     +1.5d00*(df(1,2,0,0)+df(1,2,1,0)-df(1,2,0,1)-df(1,2,1,1))&
-     +0.25d00*(df(2,2,0,0)-df(2,2,1,0)-df(2,2,0,1)+df(2,2,1,1))
-
-return
-end SUBROUTINE get_coefficients
-!***********************************************************************
-SUBROUTINE get_interpol_xy(qx,qy,dg,order)
-! Stefan Typel for the CompOSE core team, version 0.04, 2016/10/28
-USE compose_internal
-implicit none
-integer :: order,ix,iy
-double precision,intent(in) :: qx,qy
-double precision,intent(out) :: dg(0:2,0:2)
-double precision :: xx(-2:5),yy(-2:5)
-
-xx(-2:-1) = 0.d00
-yy(-2:-1) = 0.d00
-xx(0) = 1.d00
-yy(0) = 1.d00
-do ix=1,5,1
-   xx(ix) = xx(ix-1)*qx
-   yy(ix) = yy(ix-1)*qy
-end do
-
-dg(0:2,0:2) = 0.d00
-
-if (order == 0) then
-   ! function
-   do ix=0,5,1
-      do iy=0,5,1
-         dg(0,0) = dg(0,0)+fc(ix,iy)*xx(ix)*yy(iy)
-      end do
-   end do
-else
-   ! function and derivatives
-   do ix=0,5,1
-      do iy=0,5,1
-         dg(0,0) = dg(0,0)+fc(ix,iy)*xx(ix)*yy(iy)
-         dg(1,0) = dg(1,0)+fc(ix,iy)*xx(ix-1)*yy(iy)*dble(ix)
-         dg(0,1) = dg(0,1)+fc(ix,iy)*xx(ix)*yy(iy-1)*dble(iy)
-         dg(2,0) = dg(2,0)+fc(ix,iy)*xx(ix-2)*yy(iy)*dble(ix*(ix-1))
-         dg(1,1) = dg(1,1)+fc(ix,iy)*xx(ix-1)*yy(iy-1)*dble(iy*ix)
-         dg(0,2) = dg(0,2)+fc(ix,iy)*xx(ix)*yy(iy-2)*dble(iy*(iy-1))
-         dg(2,1) = dg(2,1)+fc(ix,iy)*xx(ix-2)*yy(iy-1)*dble(ix*(ix-1)*iy)
-         dg(1,2) = dg(1,2)+fc(ix,iy)*xx(ix-1)*yy(iy-2)*dble(ix*iy*(iy-1))
-         dg(2,2) = dg(2,2)+fc(ix,iy)*xx(ix-2)*yy(iy-2)*&
-              dble(ix*(ix-1)*iy*(iy-1))
-      end do
-   end do
-
-   ! rescaling
-   if (dx > 0.d00) then
-      dg(1,0) = dg(1,0)/dx
-      dg(2,0) = dg(2,0)/dx**2
-   end if
-   if (dy > 0.d00) then
-      dg(0,1) = dg(0,1)/dy
-      dg(0,2) = dg(0,2)/dy**2
-   end if
-   if ((dx > 0.d00).and.(dy > 0.)) then
-      dg(1,1) = dg(1,1)/(dx*dy)
-      dg(2,1) = dg(2,1)/((dx**2)*dy)
-      dg(1,2) = dg(1,2)/(dx*(dy**2))
-      dg(2,2) = dg(2,2)/(dx*dy)**2
-   end if
-end if
-
-return
-end SUBROUTINE get_interpol_xy
 !***********************************************************************
 SUBROUTINE run_terminal(iwr)
 ! Stefan Typel for the CompOSE core team, version 1.12, 2017/12/13
-USE compose_internal
+ use compose_internal
+ use m_get_tables, only : init_eos_table_term
+
+
 implicit none
 integer :: iwr,iterm,iinit
 
@@ -7097,64 +5285,7 @@ end select
 
 end SUBROUTINE run_terminal
 !***********************************************************************
-SUBROUTINE init_eos_table_term(iwr,iterm,iinit)
-! Stefan Typel for the CompOSE core team, version 1.04, 2017/11/16
-USE compose_internal
-implicit none
-integer :: nbl,iwr,iterm,iunit2,ierror,inew,iinit,iyq
 
-! maximum number of subtables
-nbl = 10
-
-iunit2 = 31
-
-open(unit=iunit2,file='eos.init',&
-     status='old',action='read',iostat=ierror)
-if (ierror == 0) then
-!   write(*,*)
-!   write(*,*) ' The file eos.init exists already.'
-!   write(*,*) ' Do you want to generate a new file eos.init?'
-!   write(*,*) ' Please select:'
-!   write(*,*) ' 1: Yes'
-!   write(*,*) ' else: No'
-   !   read(5,*) inew
-   inew = 0
-else
-   inew = 1
-end if
-close(unit=iunit2)
-if (iterm == 999) inew = 1
-
-if (inew == 1) then
-   open(unit=iunit2,file='eos.init',&
-        status='unknown',action='write',iostat=ierror)
-
-   if (iterm /= 999) then
-      write(*,*)
-      write(*,*) ' The file eos.init does not exist.'
-   end if
-   write(*,*)
-   write(*,*) ' generating a new file eos.init'
-
-   call read_eos_tables_tnyb(iwr,1,iunit2,0,iyq)
-
-   call read_eos_table_thermo(iwr,nbl,1,iunit2,iyq)
-
-   call read_eos_table_compo(iwr,nbl,1,iunit2)
-
-   call read_eos_table_micro(iwr,nbl,1,iunit2)
-
-   write(*,*)
-   write(*,*) ' new file eos.init generated'
-   write(*,*)
-
-   close(unit=iunit2)
-end if
-
-iinit = inew
-
-end SUBROUTINE init_eos_table_term
-!***********************************************************************
 SUBROUTINE init_quant()
 ! Stefan Typel for the CompOSE core team, version 1.08, 2017/11/16
 USE compose_internal
@@ -8119,10 +6250,14 @@ end SUBROUTINE init_para
 !***********************************************************************
 SUBROUTINE get_eos_table_term(iwr,iinit)
 ! Stefan Typel for the CompOSE core team, version 1.02, 2017/11/16
-USE compose_internal
+ use compose_internal
+ use omp_lib
+ use m_get_tables
 implicit none
 integer :: iwr,iinit,nbl,iunit2,iunit3,iunit4,ierror,iv,ibeta,iyq,&
      ivar(4),idxp(dim_ip),idxq(dim_iq),idxm(dim_im)
+double precision :: timei,timef
+
 
 ! maximum number of subtables
 nbl = 10
@@ -8178,13 +6313,7 @@ end if
 close(unit=iunit4)
 
 
-call read_eos_tables_tnyb(iwr,0,0,iinit,iyq)
-
-call read_eos_table_thermo(iwr,nbl,2,0,iyq)
-
-call read_eos_table_compo(iwr,nbl,2,0)
-
-call read_eos_table_micro(iwr,nbl,2,0)
+call read_eos_4_tables(iwr,nbl,iyq,ii_thermo=2,ii_tynb=0,unit=0,iinit=0)
 
 call get_diff_rules()
 
