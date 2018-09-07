@@ -35,18 +35,15 @@ contains
     nthreads = 3
   endif
 
-  ! store number of threads
-  old_nthreads = omp_get_num_threads();
-
   ! open omp parallel region with only nthreads threads
 
   !$OMP PARALLEL num_threads(nthreads)
   !$OMP SINGLE
   !$OMP TASK
-  call read_eos_table_thermo(iwr,nbl,ii_thermo,unit,iyq)
+  call read_eos_table_compo(iwr,nbl,ii_thermo,unit)
   !$OMP END TASK
   !$OMP TASK
-  call read_eos_table_compo(iwr,nbl,ii_thermo,unit)
+  call read_eos_table_thermo(iwr,nbl,ii_thermo,unit,iyq)
   !$OMP END TASK
   !$OMP TASK
   call read_eos_table_micro(iwr,nbl,ii_thermo,unit)

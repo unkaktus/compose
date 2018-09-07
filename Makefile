@@ -42,8 +42,8 @@ else
    LINK = $(FC)
 endif
 
-DEBUG = -g -DDEBUG -debug -fbacktrace -fbounds-check -ffpe-trap=zero,overflow,underflow
-FC_FLAGS = -O3  -cpp -pg -fopenmp #$(DEBUG) #$(HDF5_C)
+DEBUG = -g -DDEBUG -pg -debug -fbacktrace -fbounds-check -ffpe-trap=zero,overflow,underflow
+FC_FLAGS = -O3   -cpp -fopenmp #$(DEBUG) #$(HDF5_C)
 CC_FLAGS = -g -O3 -cpp
 
 LD_LIB = $(HDF5_LIB)
