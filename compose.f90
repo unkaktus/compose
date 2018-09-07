@@ -1983,7 +1983,7 @@ subroutine get_eos_table(iwr)
                  ' at n_b =',arg2(2),' fm^-3 and Y_q =',arg2(3)
                i_entr = 1
              else
-               if (y > -1.d00) then
+              ! if (y > -1.d00) then
                  ! no output if no solution of beta equilibrium
                  if (iout == 1) then
                    ! ASCII
@@ -2048,7 +2048,7 @@ subroutine get_eos_table(iwr)
                    end if
 #endif
                  end if
-               end if
+            !   end if
              end if
            end do
          else
@@ -2098,7 +2098,7 @@ subroutine get_eos_table(iwr)
                        ' at n_b =',arg(2),' fm^-3 and Y_q =',arg(3)
                      i_entr = 1
                    else
-                     if (y > -1.d00) then
+                     !if (y > -1.d00) then
                        ! no output if no solution of beta equilibrium
                        if (iout == 1) then
                          !ASCII
@@ -2166,7 +2166,7 @@ subroutine get_eos_table(iwr)
 
 #endif
                        end if
-                     end if
+                     ! end if
                    end if
                  end do
                end do
