@@ -2352,7 +2352,7 @@ subroutine get_eos_table(iwr)
 end SUBROUTINE get_eos_table
 !***********************************************************************
 subroutine get_eos(t,n,y,b,ipl,i_beta,i_entr,eos_thermo)
-! Stefan Typel for the CompOSE core team, version  1.13, 2018/06/29
+! Stefan Typel for the CompOSE core team, version  1.13, 2018/09/07
  use compose_internal, only : arg, idx_argx, idx_ipl, imap, jmap, arg2,&
    & tab_thermo, tab_para, dim_idx, eos_dim, val_rpl, dim_qtyt
  implicit none
@@ -2441,43 +2441,6 @@ subroutine get_eos(t,n,y,b,ipl,i_beta,i_entr,eos_thermo)
 
    !write(*,*) ' s_min s_max',s_min,s_max
    if ((s < s_max).and.(s > s_min)) then
-
-      ! 2018/06/29 ->
-      itmp = -1
-      sm = s_min
-      i1 = 0
-      do while ((itmp < 0).and.(i1 < (dim_idx(1)-1)))
-         i1 = i1+1
-         arg(1) = tab_para(i1,1)
-         arg2(1) = arg(1)
-         !+++++++++++++++++++++++++++++++++++++++++++
-         call get_eos_sub_s(y,ipl,ierr,i_beta,i_entr,eos_thermo)
-         !+++++++++++++++++++++++++++++++++++++++++++
-         sp = eos_thermo(2)
-         if (sp > sm) then
-            s_min = sm
-            s_max = sp
-         else
-            s_min = sp
-            s_max = sm
-         end if
-         if ((s < s_max).and.(s >= s_min)) then
-            itmp = i1-1
-            t_min = tab_para(itmp,1)
-            t_max = tab_para(itmp+1,1)
-            s_min = sm
-            s_max = sp
-         else
-            sm = sp
-         end if
-         !write(*,*) i1,arg(1),sp,itmp,t_min,t_max
-      end do
-      !write(*,*) itmp,t_min,t_max,s_min,s_max
-      if (itmp < 0) then
-         i_entr = 2
-         return
-      end if
-      ! 2018/06/29 <-
 
       !s_max = s_max-s
       !s_min = s_min-s
@@ -2592,40 +2555,6 @@ subroutine get_eos_beta(y,ipl,ierr,i_entr, eos_thermo)
 #endif
 
    ! determination of zero
-
-   ! 2018/06/29 ->
-     itmp = -1
-     fm = f_min
-   i3 = 0
-   do while ((itmp < 0).and.(i3 < (dim_idx(3)-1)))
-      i3 = i3+1
-      arg(3) = tab_para(i3,3)
-      !++++++++++++++++++++++++++++++++++++
-      call get_eos_sub(ipl,ierr,0,1,i_entr)
-      !++++++++++++++++++++++++++++++++++++
-      fp = eos_thermo(5)
-      if (fp > fm) then
-         f_min = fm
-         f_max = fp
-      else
-         f_min = fp
-         f_max = fm
-      end if
-      if ((0.d00 < f_max).and.(0.d00 >= f_min)) then
-         itmp = i3-1
-         y_min = tab_para(itmp,3)
-         y_max = tab_para(itmp+1,3)
-         f_min = fm
-         f_max = fp
-      else
-         fm = fp
-      end if
-   end do
-   if (itmp < 0) then
-      y = -2.d00
-      return
-   end if
-   ! 2018/06/29 <-
 
    d_y = 1.d00
    do while (dabs(d_y) > 1.d-12)
@@ -5520,7 +5449,7 @@ write(*,*) ' *************************************************'
 write(*,*) ' *              Welcome to CompOSE               *'
 write(*,*) ' * CompStar Online Supernovae Equations of State *'
 write(*,*) ' *                 Version 2.17                  *'
-write(*,*) ' *                  2018/06/29                   *'
+write(*,*) ' *                  2018/09/07                   *'
 write(*,*) ' *************************************************'
 write(*,*)
 write(*,*) ' This program helps to generate user-specified EoS tables'
