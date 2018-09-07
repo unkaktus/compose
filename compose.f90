@@ -1983,7 +1983,10 @@ subroutine get_eos_table(iwr)
                  ' at n_b =',arg2(2),' fm^-3 and Y_q =',arg2(3)
                i_entr = 1
              else
-              ! if (y > -1.d00) then
+#ifndef HAVE_WEB
+               !In web-app version this if has to be commented
+               if (y > -1.d00) then
+#endif
                  ! no output if no solution of beta equilibrium
                  if (iout == 1) then
                    ! ASCII
@@ -2048,7 +2051,9 @@ subroutine get_eos_table(iwr)
                    end if
 #endif
                  end if
-            !   end if
+#ifndef HAVE_WEB
+               end if
+#endif
              end if
            end do
          else
@@ -2098,7 +2103,10 @@ subroutine get_eos_table(iwr)
                        ' at n_b =',arg(2),' fm^-3 and Y_q =',arg(3)
                      i_entr = 1
                    else
-                     !if (y > -1.d00) then
+#ifndef HAVE_WEB
+                     ! In web-app version this if has to be commented
+                     if (y > -1.d00) then
+#endif
                        ! no output if no solution of beta equilibrium
                        if (iout == 1) then
                          !ASCII
@@ -2166,7 +2174,9 @@ subroutine get_eos_table(iwr)
 
 #endif
                        end if
-                     ! end if
+#ifndef HAVE_WEB
+                     end if
+#endif
                    end if
                  end do
                end do
@@ -2348,7 +2358,6 @@ subroutine get_eos_table(iwr)
  if (allocated(r1d)) deallocate(r1d)
  if (allocated(r2d)) deallocate(r2d)
 
- return
 end SUBROUTINE get_eos_table
 !***********************************************************************
 subroutine get_eos(t,n,y,b,ipl,i_beta,i_entr,eos_thermo)

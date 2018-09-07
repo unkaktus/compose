@@ -8,7 +8,7 @@ three major purposes:
 - **CompOSE** is a repository of EoS tables in a common format for direct usage
   with information on a large number of thermodynamic properties, on the
   chemical composition of dense matter and, if available, on microphysical
-  quantities of the constituents.  
+  quantities of the constituents.
 - **CompOSE** allows to interpolate the
   provided tables using different schemes to obtain the relevant quantities,
   selected by the user, for grids that are tailored to specific applications.
@@ -28,27 +28,34 @@ parameters. However, we offer several computational tools that allow the user
 to extract the data from the tables that are relevant for her/him. The
 present release of the **CompOSE** tools contains the following files
 
-- Makefile  
+- Makefile
   A Makefile using the gnu make utility which allows to build the program
   compose from the existing source files (see below). At present it employs
   the gfortran and gcc compilers. A flag can be set in the Makefile to
   enable/disable the compilation of the HDF5 output part.
 
-* compose.f90  
+* compose.f90
   Main compose code.
 
-* composemodules.f90  
+* composemodules.f90
   Contains all the modules used by compose apart from those specific to the
   HDF5 output part.
 
-* hdf5compose.f90  
+* hdf5compose.f90
   Interface for HDF5 output.
 
-* hdf5writecompose.c  
+* hdf5writecompose.c
   HDF5 output routines.
 
-* hdf5readcompose.c  
+* hdf5readcompose.c
   Example routines for reading the HDF5 output.
 
 **CompOSE** is a service initiated by the CompStar European network and maintained
 mainly by C. Ishizuka, T. Klaehn, M. Marcini, M. Oertel, and S. Typel (contact develop@compose.obspm.fr).
+
+
+INSTALL :
+
+in the normal case type "make" or "make compose"
+
+If you want to build the version running on the WEB APP, type "make compose_for_web"

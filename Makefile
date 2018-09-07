@@ -74,6 +74,10 @@ $(NAME):  $(OBJ_F) $(OBJ_C)
 	@echo building compose;
 	$(LINK)  $(FC_FLAGS) -o $(EXEC) $(OBJ_F) $(OBJ_C) $(LD_LIB)
 
+
+$(NAME)_for_web : FC_FLAGS += -DHAVE_WEB
+$(NAME)_for_web : $(NAME)
+
 %.o: %.f90
 	$(FC) -c $(FC_FLAGS) $< -o $@
 
