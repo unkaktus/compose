@@ -2451,8 +2451,8 @@ subroutine get_eos(t,n,y,b,ipl,i_beta,i_entr,eos_thermo)
    !write(*,*) ' s_min s_max',s_min,s_max
    if ((s < s_max).and.(s > s_min)) then
 
-      !s_max = s_max-s
-      !s_min = s_min-s
+     s_max = s_max-s
+     s_min = s_min-s
      ds = 1.d00
      i1 = 0
      do while (dabs(ds) > 1.d-12*s)
