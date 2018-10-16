@@ -3,6 +3,33 @@
 ! modules
 !***********************************************************************
 !***********************************************************************
+
+!***********************************************************************
+module general_var
+ ! Marco Mancini for the CompOSE core team,  2018/10/16
+ ! contains common variables for compose
+
+ implicit none
+ private
+
+ integer,parameter :: dp = kind(1.d0)
+
+ type :: tabulation_var_i
+   integer :: t = 0, nb = 0, yq = 0, b = 0, tnyb = 0
+ end type tabulation_var_i
+ type :: tabulation_var_r
+   real(dp) :: t = 0._dp, nb = 0._dp, yq = 0._dp, b = 0._dp
+ end type tabulation_var_r
+
+ ! tabulation scheme is red here : 0 explicit , 1 loop
+ integer,public :: tabulation_schema  ! replace i_tab
+ type(tabulation_var_i),public :: pts
+ type(tabulation_var_r),public :: tabMin, tabMax
+
+end module general_var
+
+
+!***********************************************************************
 module eos_tables
  ! Stefan Typel for the CompOSE core team, version 1.11, 2017/05/22
 

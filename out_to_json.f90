@@ -7,8 +7,8 @@
 !***********************************************************************
 
 
-module  m_out_to_json
-
+module m_out_to_json
+ use general_var
  implicit none
 
  private
@@ -25,6 +25,7 @@ contains
   integer :: i1,i2,ifile = 10000
   character(11) :: f1 = '(a,i0,a)'
   character(16) :: f2 = '(a,i0,a,i6,a)'
+  character(20) :: f3 = '(a,i0,2(a,f0.7),a)'
 
   open(unit=ifile,file='eos.info.json',status='replace')
 
@@ -39,14 +40,18 @@ contains
   endif
   write(ifile,*) '  "columns" : {'
   i2 = i2+1
-  write(ifile,f1) '"',i2,'":{"title": "temperature T", "unit": "MeV" ,"symbol":"T"},'
+  write(ifile,f1) '"',i2,'":{"title": "temperature T", "unit": "MeV" ,"symbol":"T",'
+  write(ifile,f3) '          "npt":"',pts%t,'", "min":"',tabMin%t,'", "max":"',tabMax%t,'"},'
   i2 = i2+1
-  write(ifile,f1) '"',i2,'":{"title": "baryon number density n_b", "unit": "fm^-3","symbol":"nb"},'
+  write(ifile,f1) '"',i2,'":{"title": "baryon number density n_b", "unit": "fm^-3","symbol":"nb",'
+  write(ifile,f3) '          "npt":"',pts%nb,'", "min":"',tabMin%nb,'", "max":"',tabMax%nb,'"},'
   i2 = i2+1
-  write(ifile,f1) '"',i2,'":{"title": "hadronic charge fraction Y_q", "unit":"","symbol":"Yq"},'
+  write(ifile,f1) '"',i2,'":{"title": "hadronic charge fraction Y_q", "unit":"","symbol":"Yq",'
+  write(ifile,f3) '          "npt":"',pts%yq,'", "min":"',tabMin%yq,'", "max":"',tabMax%yq,'"},'
   if (irpl > 0) then
     i2 = i2+1
-    write(ifile,f1) '"',i2,'":{"title": "magnetic field strength B", "unit":"G","symbol":"B"},'
+    write(ifile,f1) '"',i2,'":{"title": "magnetic field strength B", "unit":"G","symbol":"B",'
+  write(ifile,f3) '          "npt":"',pts%b,'", "min":"',tabMin%b,'", "max":"',tabMax%b,'"},'
   endif
   do i1=1,n_qty,1
     i2 = i2+1

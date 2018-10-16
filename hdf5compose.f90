@@ -1,5 +1,5 @@
 MODULE precision
-      
+
   integer,parameter :: dp = selected_real_kind(15)
 
 END MODULE precision
@@ -19,15 +19,16 @@ MODULE hdfparameters
   integer,allocatable :: index_thermo(:),index_thermo_add(:),index_err(:)
   integer, allocatable :: index_yi(:),index_av(:),index_micro(:)
 
-contains 
+contains
 
-  subroutine initialise_hdf5(n_nb,n_t,n_yq,i_tab)
+  subroutine initialise_hdf5(n_nb,n_t,n_yq)
 
-    USE compose_internal 
+   use general_var, only : tabulation_schema
+    USE compose_internal
     IMPLICIT NONE
-    
-    integer n_nb,n_t,n_yq,i_tab
-    
+
+    integer :: n_nb,n_t,n_yq
+
     m_nb = n_nb
     n_temp = n_t
     o_y_q = n_yq
@@ -96,7 +97,7 @@ contains
     end if
 
 
-    IF(i_tab.eq.0) then
+    IF(tabulation_schema.eq.0) then
        allocate(nb_hdf5(m_nb))
        allocate(t_hdf5(m_nb))
        allocate(y_q_hdf5(m_nb))
@@ -114,14 +115,14 @@ contains
 
     USE compose_internal
     IMPLICIT NONE
-    
+
     integer itab
 
     integer :: openfile = 1 ! =1 if file for writing hdf5 has not been opened
                             ! =2 if file is already open
-                            ! the temperature, density and y_q arrays are 
+                            ! the temperature, density and y_q arrays are
                             ! only written the first time (i.e. openfile = 1)
-    
+
     write(*,*) 'writing ',n_qty,' thermodynamic quantities into file '
 
     call hdf5_write_thermo(m_nb,n_temp,o_y_q, n_qty, nb_hdf5, t_hdf5, y_q_hdf5, &
@@ -133,10 +134,10 @@ contains
                              thermo_hdf5_add,index_thermo_add,openfile,itab)
 
     write(*,*) 'writing ',n_p,' pairs into file'
-      
+
     call hdf5_write_compo_p(m_nb,n_temp,o_y_q, n_p, nb_hdf5, t_hdf5, y_q_hdf5, &
                      yi_hdf5,index_yi,openfile,itab)
-    
+
     write(*,*) 'writing ',n_q,' quadruples into file'
 
     call hdf5_write_compo_q(m_nb,n_temp,o_y_q, n_q, nb_hdf5, t_hdf5, y_q_hdf5, &
@@ -154,16 +155,15 @@ contains
   end subroutine write_hdf5
 
 
-  subroutine read_hdf5(itab)
-
-    USE compose_internal
+  subroutine read_hdf5()
+   use general_var, only : tabulation_schema
+   use compose_internal
     IMPLICIT NONE
 
-    integer itab
-    
+
     integer :: openfile = 1 ! =1 if file for reading hdf5 has not been opened
                             ! =2 if file is already open
-                            ! the temperature, density and y_q arrays are 
+                            ! the temperature, density and y_q arrays are
                             ! only read the first time (i.e. openfile = 1)
     character(30) qty_name,index_name
 
@@ -174,8 +174,8 @@ contains
     call hdf5_read_dimensions(m_nb_rd,n_temp_rd,o_y_q_rd,n_qty_rd,n_add_rd,&
                               n_p_rd,n_q_rd,n_m_rd,n_err_rd,i_tab_rd,openfile)
 
-    IF(itab.ne.i_tab_rd) then
-       write(*,*) 'error reading file, i_tab is',i_tab_rd,' not ',itab
+    IF(tabulation_schema.ne.i_tab_rd) then
+       write(*,*) 'error reading file, i_tab is',i_tab_rd,' not ',tabulation_schema
        stop
     end IF
 
@@ -187,7 +187,7 @@ contains
        write(*,*) 'error reading the number of points in nb',m_nb,m_nb_rd
        stop
     end IF
-    IF(itab.eq.0) then
+    IF(tabulation_schema.eq.0) then
        IF(m_nb.ne.n_temp_rd) then
           write(*,*) 'error reading the number of points in T',m_nb,n_temp_rd
           stop
@@ -198,7 +198,7 @@ contains
           stop
        end IF
     end IF
-    IF(itab.eq.0) then
+    IF(tabulation_schema.eq.0) then
        IF(m_nb.ne.o_y_q_rd) then
           write(*,*) 'error reading the number of points in yq',m_nb,o_y_q_rd
           stop
@@ -245,10 +245,10 @@ contains
 !!$    n_m = n_m_rd
 !!$    n_err = n_err_rd
 
-    IF(itab == 0) then
-       call initialise_hdf5(m_nb_rd,1,1,itab)
+    IF(tabulation_schema == 0) then
+       call initialise_hdf5(m_nb_rd,1,1)
     else
-       call initialise_hdf5(m_nb_rd,n_temp_rd,o_y_q_rd,itab)
+       call initialise_hdf5(m_nb_rd,n_temp_rd,o_y_q_rd)
     end IF
 
 
@@ -263,7 +263,7 @@ contains
                             qty_name,index_name)
 
        openfile = 2
-      
+
     end IF
 
     IF(n_add.ne.0) then
@@ -323,7 +323,7 @@ contains
     end IF
 
     open(33,file='readtest.d',status='unknown')
-    IF(itab.eq.0) then
+    IF(tabulation_schema == 0) then
        DO i = 1,m_nb
           write(33,*) nb_hdf5(i),t_hdf5(i),y_q_hdf5(i),thermo_hdf5(i,1,1,1:n_qty),yi_hdf5(i,1,1,1:n_p),&
             aav_hdf5(i,1,1,1:n_q),zav_hdf5(i,1,1,1:n_q),yav_hdf5(i,1,1,1:n_q),nav_hdf5(i,1,1,1:n_q)&

@@ -1743,6 +1743,7 @@ end SUBROUTINE define_eos_table
 !***********************************************************************
 subroutine get_eos_table(iwr)
  ! Stefan Typel for the CompOSE core team, version 1.19, 2017/12/13
+ use general_var, only: tabulation_schema, pts, tabMin, tabMax
  use compose_internal
  use m_out_to_json
 #if defined hdf5
@@ -1750,13 +1751,12 @@ subroutine get_eos_table(iwr)
 #endif
 
  implicit none
- integer :: i,jj, i_tny,i_beta,i_tab,ipl_t,ipl_n,ipl_y,itest,iwr,&
-   i1,i2,i3,i4,i5,i6,i7,j_t,j_nb,j_yq,n_t,n_nb,n_yq,&
+ integer :: i,jj, i_tny,i_beta,ipl_t,ipl_n,ipl_y,itest,iwr,&
+   i1,i2,i3,i4,i5,i6,i7,j_t,j_nb,j_yq,&
    i_t,i_nb,i_yq,i_entr,&
-   j_b,n_b,i_b,ierr,iunit,ierror,iunit2,n_tnyb,ipl(3)
+   j_b,i_b,ierr,iunit,ierror,iunit2,ipl(3)
 
- double precision :: t_min,t_max,d_t,nb_min,nb_max,d_nb,&
-   yq_min,yq_max,d_yq,b_min,b_max,d_b,t,n,y,b
+ double precision :: d_t,d_nb,d_yq,d_b,t,n,y,b
 
  if (iwr == 1) then
    write(*,*)
@@ -1820,130 +1820,131 @@ subroutine get_eos_table(iwr)
 
      call write_errors(ierr)
 
+     ! tabulation scheme is red here : 0 explicit , 1 loop
      read(iunit,*)
-     read(iunit,*) i_tab
+     read(iunit,*) tabulation_schema
      read(iunit,*)
-     if (i_tab == 0) then
-       read(iunit,*) n_tnyb
-       if (n_tnyb < 1) then
+     if (tabulation_schema == 0) then
+       read(iunit,*) pts%tnyb
+       if (pts%tnyb < 1) then
          ierr = ierr +1
          if (ierr < dim_err) error_msg(ierr) = 80
        end if
      else
 
        if (irpl == 0) then
-         read(iunit,*) t_min,nb_min,yq_min
-         read(iunit,*) t_max,nb_max,yq_max
-         read(iunit,*) n_t,n_nb,n_yq
+         read(iunit,*) tabMin%t,tabMin%nb,tabMin%yq
+         read(iunit,*) tabMax%t,tabMax%nb,tabMax%yq
+         read(iunit,*) pts%t,pts%nb,pts%yq
          read(iunit,*) i_t,i_nb,i_yq
        else
-         read(iunit,*) t_min,nb_min,yq_min,b_min
-         read(iunit,*) t_max,nb_max,yq_max,b_max
-         read(iunit,*) n_t,n_nb,n_yq,n_b
+         read(iunit,*) tabMin%t,tabMin%nb,tabMin%yq,tabMin%b
+         read(iunit,*) tabMax%t,tabMax%nb,tabMax%yq,tabMax%b
+         read(iunit,*) pts%t,pts%nb,pts%yq,pts%b
          read(iunit,*) i_t,i_nb,i_yq,i_b
        end if
 
        if (i_t == 0) then
        else
-         if (t_min <= 0.d00) then
+         if (tabMin%t <= 0.d00) then
            ierr = ierr +1
            if (ierr < dim_err) error_msg(ierr) = 82
          end if
        end if
-       if (t_max < t_min) then
+       if (tabMax%t < tabMin%t) then
          ierr = ierr +1
          if (ierr < dim_err) error_msg(ierr) = 83
        end if
-       if (n_t < 1) n_t = 1
+       if (pts%t < 1) pts%t = 1
        if (i_t == 0) then
-         if (n_t == 1) then
+         if (pts%t == 1) then
            d_t = 0.d00
          else
-           d_t = (t_max-t_min)/dble(n_t-1)
+           d_t = (tabMax%t-tabMin%t)/dble(pts%t-1)
          end if
        else
-         if (n_t == 1) then
+         if (pts%t == 1) then
            d_t = 1.d00
          else
-           d_t = exp(log(t_max/t_min)/dble(n_t-1))
+           d_t = exp(log(tabMax%t/tabMin%t)/dble(pts%t-1))
          end if
        end if
 
-       if (nb_max < nb_min) then
+       if (tabMax%nb < tabMin%nb) then
          ierr = ierr +1
          if (ierr < dim_err) error_msg(ierr) = 85
        end if
-       if (n_nb < 1) n_nb = 1
+       if (pts%nb < 1) pts%nb = 1
        if (i_nb == 0) then
-         if (n_nb == 1) then
+         if (pts%nb == 1) then
            d_nb = 0.d00
          else
-           d_nb = (nb_max-nb_min)/dble(n_nb-1)
+           d_nb = (tabMax%nb-tabMin%nb)/dble(pts%nb-1)
          end if
        else
-         if (n_nb == 1) then
+         if (pts%nb == 1) then
            d_nb = 1.d00
          else
-           d_nb = exp(log(nb_max/nb_min)/dble(n_nb-1))
+           d_nb = exp(log(tabMax%nb/tabMin%nb)/dble(pts%nb-1))
          end if
        end if
 
        if (i_beta /= 0) then
-         yq_min = 0.d00
-         yq_max = 0.d00
+         tabMin%yq = 0.d00
+         tabMax%yq = 0.d00
          d_yq = 0.d00
-         n_yq = 1
+         pts%yq = 1
        else
 
-         if (yq_max < yq_min) then
+         if (tabMax%yq < tabMin%yq) then
            ierr = ierr +1
            if (ierr < dim_err) error_msg(ierr) = 87
          end if
-         if (yq_max > 1.d00) then
+         if (tabMax%yq > 1.d00) then
            ierr = ierr +1
            if (ierr < dim_err) error_msg(ierr) = 88
          end if
-         if (n_yq < 1) n_yq = 1
+         if (pts%yq < 1) pts%yq = 1
          if (i_yq == 0) then
-           if (n_yq == 1) then
+           if (pts%yq == 1) then
              d_yq = 0.d00
            else
-             d_yq = (yq_max-yq_min)/dble(n_yq-1)
+             d_yq = (tabMax%yq-tabMin%yq)/dble(pts%yq-1)
            end if
          else
-           if (n_yq == 1) then
+           if (pts%yq == 1) then
              d_yq = 1.d00
            else
-             d_yq = exp(log(yq_max/yq_min)/dble(n_yq-1))
+             d_yq = exp(log(tabMax%yq/tabMin%yq)/dble(pts%yq-1))
            end if
          end if
        end if
 
        if (irpl > 0) then
 
-         if (b_max < b_min) then
+         if (tabMax%b < tabMin%b) then
            ierr = ierr +1
            if (ierr < dim_err) error_msg(ierr) = 90
          end if
-         if (n_b < 1) n_b = 1
+         if (pts%b < 1) pts%b = 1
          if (i_b == 0) then
-           if (n_b == 1) then
+           if (pts%b == 1) then
              d_b = 0.d00
            else
-             d_b = (b_max-b_min)/dble(n_b-1)
+             d_b = (tabMax%b-tabMin%b)/dble(pts%b-1)
            end if
          else
-           if (n_b == 1) then
+           if (pts%b == 1) then
              d_b = 1.d00
            else
-             d_b = exp(log(b_max/b_min)/dble(n_b-1))
+             d_b = exp(log(tabMax%b/tabMin%b)/dble(pts%b-1))
            end if
          end if
        else
-         b_min = 0.d00
-         b_max = 0.d00
+         tabMin%b = 0.d00
+         tabMax%b = 0.d00
          d_b = 0.d00
-         n_b = 1
+         pts%b = 1
          i_b = 0
        end if
      end if
@@ -1957,19 +1958,19 @@ subroutine get_eos_table(iwr)
      else
        ! HDF5
 #if defined hdf5
-       IF(i_tab == 0) then
-         call initialise_hdf5(n_tnyb,1,1,i_tab)
+       IF(tabulation_schema == 0) then
+         call initialise_hdf5(pts%tnyb,1,1)
        else
-         call initialise_hdf5(n_nb,n_t,n_yq,i_tab)
+         call initialise_hdf5(pts%nb,pts%t,pts%yq)
        end IF
 #endif
      end if
 
      if (ierror == 0) then
        if (ierr == 0) then
-         if (i_tab == 0) then
+         if (tabulation_schema == 0) then
            ! use list of parameters from file eos.parameters
-           do i_tny=1,n_tnyb,1
+           do i_tny=1, pts%tnyb
              if (irpl > 0) then
                read(iunit,*) t,n,y,b
              else
@@ -2063,33 +2064,33 @@ subroutine get_eos_table(iwr)
            ! !$OMP DEFAULT(SHARED) &
            ! !$OMP PRIVATE(j_t,t,j_nb,n,j_yq,y,j_b,b,arg,arg2)
 
-           do j_t=1,n_t,1
+           do j_t=1,pts%t,1
 
              if (i_t == 0) then
-               t = t_min+d_t*dble(j_t-1)
+               t = tabMin%t + d_t * dble(j_t-1)
              else
-               t = t_min*(d_t**(j_t-1))
+               t = tabMin%t * (d_t**(j_t-1))
              end if
 
-             do j_nb=1,n_nb,1
+             do j_nb=1, pts%nb
                if (i_nb == 0) then
-                 n = nb_min+d_nb*dble(j_nb-1)
+                 n = tabMin%nb + d_nb * dble(j_nb-1)
                else
-                 n = nb_min*(d_nb**(j_nb-1))
+                 n = tabMin%nb * (d_nb**(j_nb-1))
                end if
 
-               do j_yq=1,n_yq,1
+               do j_yq=1, pts%yq
                  if (i_yq == 0) then
-                   y = yq_min+d_yq*dble(j_yq-1)
+                   y = tabMin%yq + d_yq * dble(j_yq-1)
                  else
-                   y = yq_min*(d_yq**(j_yq-1))
+                   y = tabMin%yq * (d_yq**(j_yq-1))
                  end if
 
-                 do j_b=1,n_b,1
+                 do j_b=1, pts%b
                    if (i_b == 0) then
-                     b = b_min+d_b*dble(j_b-1)
+                     b = tabMin%b + d_b * dble(j_b-1)
                    else
-                     b = b_min*(d_b**(j_b-1))
+                     b = tabMin%b * (d_b**(j_b-1))
                    end if
 #if defined hdf5
                    ! magnetic field not yet implemented for HDF5 ou,arg3tput
@@ -2194,10 +2195,10 @@ subroutine get_eos_table(iwr)
      ! HDF5
 #if defined hdf5
      write(*,*)'call writing HDF5 table'
-     call write_hdf5(i_tab)
+     call write_hdf5()
      call close_hdf5
      ! testing purposes
-     call read_hdf5(i_tab)
+     call read_hdf5()
      call close_hdf5
      !****************
 #endif
@@ -6000,9 +6001,10 @@ end SUBROUTINE init_quant
 !***********************************************************************
 SUBROUTINE init_para()
 ! Stefan Typel for the CompOSE core team, version 1.07, 2017/12/13
-USE compose_internal
+ use compose_internal
+ use general_var, only: tabulation_schema
 implicit none
-integer :: iunit2,iunit4,ierror,iv,idim,ibeta,i_entr,inew,itab,iflag,ibeta2,&
+integer :: iunit2,iunit4,ierror,iv,idim,ibeta,i_entr,inew,iflag,ibeta2,&
      npt(4),ivar(4),ipl(4),ll(4)
 double precision :: x,y,z,zero,min(4),max(4)
 character(18) :: cdim(3)
@@ -6116,10 +6118,10 @@ if (inew == 1) then
    write(*,*) ' Please select the tabulation scheme for the parameters from'
    write(*,*) ' 0: explicit listing of parameter values'
    write(*,*) ' 1: loop form of parameter values'
-   itab = -1
-   do while ((itab < 0).or.(itab > 1))
-      read(5,*) itab
-      if ((itab < 0).or.(itab > 1)) then
+   tabulation_schema = -1
+   do while ((tabulation_schema < 0).or.(tabulation_schema > 1))
+      read(5,*) tabulation_schema
+      if ((tabulation_schema < 0).or.(tabulation_schema > 1)) then
          write(*,*) ' Number out of range!'
       end if
    end do
@@ -6140,10 +6142,10 @@ if (inew == 1) then
    write(iunit4,*) '# calculation of beta-equilibrium (1: yes, else: no) and for given entropy (1: yes, else: no)'
    write(iunit4,*) ibeta,i_entr
    write(iunit4,*) '# tabulation scheme (0 = explicit listing, 1 = loops, see manual)'
-   write(iunit4,*) itab
+   write(iunit4,*) tabulation_schema
    write(iunit4,*) '# parameter values (first, second and third index) depending on tabulation scheme'
 
-   if (itab == 0) then
+   if (tabulation_schema == 0) then
       write(*,*)
       write(*,*) ' How many data points of your EoS table do you want to generate?'
       npt(1) = -1
@@ -6488,7 +6490,7 @@ if (ierror /= 0) then
    stop
 else
    read(iunit2,*) (ivar(iv),iv=1,4,1),irpl
-   do iv=1,4,1
+   do iv=1,4
       read(iunit2,*) para_min(iv),para_max(iv)
    end do
    read(iunit2,*) incl_l,nadd_max,nall_max,ibeta
