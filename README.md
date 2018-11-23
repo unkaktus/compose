@@ -59,3 +59,5 @@ INSTALL :
 in the normal case type "make" or "make compose"
 
 If you want to build the version running on the WEB APP, type "make compose_for_web"
+
+this is a try
