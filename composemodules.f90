@@ -35,12 +35,12 @@ module eos_tables
 
  ! parameters
  ! dim_reg:   number of standard thermodynamic quantities in eos.thermo (7)
- ! dim_qtyt:  regular number of quantities in array eos_thermo (23)
+ ! dim_qtyt:  regular number of quantities in array eos_thermo (24)
  ! dim_qtye:  maximum number of error quantities (8)
 
  implicit none
 
- integer, parameter :: dim_reg=7, dim_qtyt=23, dim_qtye=8, dim_df=10
+ integer, parameter :: dim_reg=7, dim_qtyt=24, dim_qtye=8, dim_df=10
 
  integer :: nall_max, nadd_max, np_max, nq_max, nm_max
 

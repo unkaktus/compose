@@ -79,6 +79,7 @@ end if
 ! eos_thermo(21): E [MeV]
 ! eos_thermo(22): H [MeV]
 ! eos_thermo(23): G [MeV]
+! eos_thermo(24): epsilon (energy density) [MeV/fm^3]
 ! eos_thermo_add(1), ..., eos_thermo(n_add), at least two
 ! eos_compo_p(1), ..., eos_compo_p(n_p)
 ! eos_compo_q(1,1), ..., eos_compo_q(n_q,1): Y^av
@@ -2278,6 +2279,8 @@ subroutine get_eos_table(iwr)
        write(*,*) i2,' enthalpy per baryon H                              [MeV]        '
      if (idx_qty(i1) == 23)&
        write(*,*) i2,' free enthalpy per baryon G                         [MeV]        '
+     if (idx_qty(i1) == 24)&
+       write(*,*) i2,' energy density epsilon                       [MeV/fm^3]        '
    end do
    if (n_add > 0) then
      do i1=1,n_add,1
@@ -3234,6 +3237,8 @@ if (ibeta /= 1) then
    eosthermo_out(22) = (eosthermo_out(8)+1.d00)*m_n
    ! G = g/n
    eosthermo_out(23) = (eosthermo_out(9)+1.d00)*m_n
+   ! epsilon = e
+   eosthermo_out(24) = eosthermo_out(21)*arg2(2)
 
    ! error quantities
 
@@ -3815,6 +3820,8 @@ subroutine eos_interpol_d3(m,q,ipl,inmp,ibeta,dim_ipl, eosthermo_out)
    eosthermo_out(22) = (eosthermo_out(8)+1.d00)*m_n
    ! G = g/n
    eosthermo_out(23) = (eosthermo_out(9)+1.d00)*m_n
+   ! epsilon = e
+   eosthermo_out(24) = eosthermo_out(21)*arg2(2)
    !! !$OMP END SINGLE
 
    if (inmp == 1) then
@@ -4397,6 +4404,8 @@ if (ibeta /= 1) then
    eosthermo_out(22) = (eosthermo_out(8)+1.d00)*m_n
    ! G = g/n
    eosthermo_out(23) = (eosthermo_out(9)+1.d00)*m_n
+   ! epsilon = e
+   eosthermo_out(24) = eosthermo_out(21)*arg2(2)
 
    ! error quantities
 
@@ -5677,6 +5686,7 @@ if (inew == 1) then
    write(*,*) ' internal energy per baryon E                       [MeV]         21'
    write(*,*) ' enthalpy per baryon H                              [MeV]         22'
    write(*,*) ' free enthalpy per baryon G                         [MeV]         23'
+   write(*,*) ' energy density                       [MeV/fm^3]         24'
    write(*,*)
    n_qty = -1
    do while ((n_qty < 0).or.(n_qty > dim_qtyt))
