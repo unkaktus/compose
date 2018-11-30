@@ -53,79 +53,60 @@ contains
     write(ifile,f1) '"',i2,'":{"title": "magnetic field strength B", "unit":"G","symbol":"B","index":"3",'
     write(ifile,f3) '         "type": "parameter", "npt":"',pts%b,'", "min":"',tabMin%b,'", "max":"',tabMax%b,'"},'
   endif
+
   do i1=1,n_qty,1
     i2 = i2+1
     select case(idx_qty(i1))
     case(1)
       write(ifile,f1) '"',i2,'":{"title": "pressure p", "unit":"MeV fm^-3",'
-      write(ifile,f1) '          "type": "thermodynamic", "index":"',idx_qty(i1),'"},'
     case(2)
       write(ifile,f1) '"',i2,'":{"title": "entropy per baryon S", "unit":"",'
-      write(ifile,f1) '          "type": "thermodynamic", "index":"',idx_qty(i1),'"},'
     case(3)
       write(ifile,f1) '"',i2,'":{"title": "shifted baryon chemical potential mu_b-m_n", "unit":"MeV",'
-      write(ifile,f1) '          "type": "thermodynamic", "index":"',idx_qty(i1),'"},'
     case(4)
       write(ifile,f1) '"',i2,'":{"title": "charge chemical potential mu_q", "unit":"MeV",'
-      write(ifile,f1) '          "type": "thermodynamic", "index":"',idx_qty(i1),'"},'
     case(5)
       write(ifile,f1) '"',i2,'":{"title": "lepton chemical potential mu_l", "unit":"MeV",'
-      write(ifile,f1) '          "type": "thermodynamic", "index":"',idx_qty(i1),'"},'
     case(6)
       write(ifile,f1) '"',i2,'":{"title": "scaled free energy per baryon F/m_n-1", "unit":"",'
-      write(ifile,f1) '          "type": "thermodynamic", "index":"',idx_qty(i1),'"},'
     case(7)
       write(ifile,f1) '"',i2,'":{"title": "scaled internal energy per baryon E/m_n-1", "unit":"",'
-      write(ifile,f1) '          "type": "thermodynamic", "index":"',idx_qty(i1),'"},'
     case(8)
       write(ifile,f1) '"',i2,'":{"title": "scaled enthalpy energy per baryon H/m_n-1", "unit":"",'
-      write(ifile,f1) '          "type": "thermodynamic", "index":"',idx_qty(i1),'"},'
     case(9)
       write(ifile,f1) '"',i2,'":{"title": "scaled free enthalpy per baryon G/m_n-1", "unit":"",'
-      write(ifile,f1) '          "type": "thermodynamic", "index":"',idx_qty(i1),'"},'
     case(10)
       write(ifile,f1) '"',i2,'":{"title": "derivative dp/dn_b|E", "unit":"MeV",'
-      write(ifile,f1) '          "type": "thermodynamic", "index":"',idx_qty(i1),'"},'
     case(11)
       write(ifile,f1) '"',i2,'":{"title": "derivative p/dE|n_b", "unit":"fm^-3",'
-      write(ifile,f1) '          "type": "thermodynamic", "index":"',idx_qty(i1),'"},'
     case(12)
       write(ifile,f1) '"',i2,'":{"title": "square of speed of sound (c_s)^2 ", "unit":"",'
-      write(ifile,f1) '          "type": "thermodynamic", "index":"',idx_qty(i1),'"},'
     case(13)
       write(ifile,f1) '"',i2,'":{"title": "specific heat capacity at constant volume c_V", "unit":"",'
-      write(ifile,f1) '          "type": "thermodynamic", "index":"',idx_qty(i1),'"},'
     case(14)
       write(ifile,f1) '"',i2,'":{"title": "specific heat capacity at constant pressure c_p", "unit":"",'
-      write(ifile,f1) '          "type": "thermodynamic", "index":"',idx_qty(i1),'"},'
     case(15)
       write(ifile,f1) '"',i2,'":{"title": "adiabatic index Gamma", "unit":"",'
-      write(ifile,f1) '          "type": "thermodynamic", "index":"',idx_qty(i1),'"},'
     case(16)
       write(ifile,f1) '"',i2,'":{"title": "expansion coefficient at constant pressure alpha_p ", "unit":"MeV^-1",'
-      write(ifile,f1) '          "type": "thermodynamic", "index":"',idx_qty(i1),'"},'
     case(17)
       write(ifile,f1) '"',i2,'":{"title": "tension coefficient at constant volume beta_V", "unit":"fm^-3",'
-      write(ifile,f1) '          "type": "thermodynamic", "index":"',idx_qty(i1),'"},'
     case(18)
       write(ifile,f1) '"',i2,'":{"title": "isothermal compressibility kappa_T", "unit":"MeV^-1 fm^3",'
-      write(ifile,f1) '          "type": "thermodynamic", "index":"',idx_qty(i1),'"},'
     case(19)
       write(ifile,f1) '"',i2,'":{"title": "isentropic compressibility kappa_S", "unit":"MeV^-1 fm^3",'
-      write(ifile,f1) '          "type": "thermodynamic", "index":"',idx_qty(i1),'"},'
     case(20)
       write(ifile,f1) '"',i2,'":{"title": "free energy per baryon F", "unit":"MeV",'
-      write(ifile,f1) '          "type": "thermodynamic", "index":"',idx_qty(i1),'"},'
     case(21)
       write(ifile,f1) '"',i2,'":{"title": "internal energy per baryon E", "unit":"MeV",'
-      write(ifile,f1) '          "type": "thermodynamic", "index":"',idx_qty(i1),'"},'
     case(22)
       write(ifile,f1) '"',i2,'":{"title": "enthalpy per baryon H", "unit":"MeV",'
-      write(ifile,f1) '          "type": "thermodynamic", "index":"',idx_qty(i1),'"},'
     case(23)
       write(ifile,f1) '"',i2,'":{"title": "free enthalpy per baryon G", "unit":"MeV",'
-      write(ifile,f1) '          "type": "thermodynamic", "index":"',idx_qty(i1),'"},'
+    case(24)
+      write(ifile,f1) '"',i2,'":{"title": "epsilon (energy density)","unit":"MeV fm^-3",'
     end select
+    write(ifile,f1) '          "type": "thermodynamic", "index":"',idx_qty(i1),'"},'
   end do
   if (n_add > 0) then
     do i1=1,n_add,1
