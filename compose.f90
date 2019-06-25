@@ -1994,7 +1994,7 @@ subroutine get_eos_table(iwr)
                    ! ASCII
                    do jj = 1,4
                      do i=1,n_q,1
-                       eos_q(3*(i-1)+jj) = eos_compo_q(i,jj)
+                       eos_q(4*(i-1)+jj) = eos_compo_q(i,jj)
                      end do
                    end do
                    if (irpl > 0) then
@@ -2113,10 +2113,10 @@ subroutine get_eos_table(iwr)
                        if (iout == 1) then
                          !ASCII
                          do i=1,n_q,1
-                           eos_q(3*(i-1)+1) = eos_compo_q(i,1)
-                           eos_q(3*(i-1)+2) = eos_compo_q(i,2)
-                           eos_q(3*(i-1)+3) = eos_compo_q(i,3)
-                           eos_q(3*(i-1)+4) = eos_compo_q(i,4)
+                           eos_q(4*(i-1)+1) = eos_compo_q(i,1)
+                           eos_q(4*(i-1)+2) = eos_compo_q(i,2)
+                           eos_q(4*(i-1)+3) = eos_compo_q(i,3)
+                           eos_q(4*(i-1)+4) = eos_compo_q(i,4)
                          end do
                          if (irpl > 0) then
                            write(iunit2,*) arg2(1),arg2(2),arg2(3),arg2(4),&
