@@ -40,10 +40,10 @@ contains
   !$OMP PARALLEL num_threads(nthreads)
   !$OMP SINGLE
   !$OMP TASK
-  call read_eos_table_compo(iwr,nbl,ii_thermo,unit)
+  call read_eos_table_thermo(iwr,nbl,ii_thermo,unit,iyq)
   !$OMP END TASK
   !$OMP TASK
-  call read_eos_table_thermo(iwr,nbl,ii_thermo,unit,iyq)
+  call read_eos_table_compo(iwr,nbl,ii_thermo,unit)
   !$OMP END TASK
   !$OMP TASK
   call read_eos_table_micro(iwr,nbl,ii_thermo,unit)
@@ -99,7 +99,6 @@ contains
     end if
     write(*,*)
     write(*,*) ' generating a new file eos.init'
-
 
     call read_eos_4_tables(iwr,nbl,iyq,ii_thermo=1,ii_tynb=1,unit=iunit2,iinit=0)
 

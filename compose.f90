@@ -121,13 +121,13 @@ subroutine init_eos_table(iwr)
  use omp_lib
  use m_get_tables
  implicit none
- integer :: nbl,iwr,iyq
+ integer :: nbl,iwr,iyq,iinit,init_flg = 0
 
 ! maximum number of subtables
  nbl = 10
 
 
- call read_eos_4_tables(iwr,nbl,iyq,ii_thermo=0,ii_tynb=0,unit=0,iinit=0)
+ call read_eos_4_tables(iwr,nbl,iyq,ii_thermo=0,ii_tynb=0,unit=0,iinit=init_flg)
 
  call get_diff_rules()
 
@@ -1674,7 +1674,7 @@ if (ierror == 0) then
 
                read(iunit,*)
                read(iunit,*) iout
-#ifndef hdf5
+#ifndef have_hdf5
                if ((iout < 1).or.(iout > 2)) then
                   ierr = ierr+1
                   if (ierr < dim_err) error_msg(ierr) = 69
@@ -1747,7 +1747,7 @@ subroutine get_eos_table(iwr)
  use general_var, only: tabulation_schema, pts, tabMin, tabMax
  use compose_internal
  use m_out_to_json
-#if defined hdf5
+#if defined have_hdf5
  use hdfparameters
 #endif
 
@@ -1958,7 +1958,7 @@ subroutine get_eos_table(iwr)
          status='unknown',action='write',iostat=ierror)
      else
        ! HDF5
-#if defined hdf5
+#if defined have_hdf5
        IF(tabulation_schema == 0) then
          call initialise_hdf5(pts%tnyb,1,1)
        else
@@ -2018,7 +2018,7 @@ subroutine get_eos_table(iwr)
                    end if
                  else
                    ! HDF5
-#if defined hdf5
+#if defined have_hdf5
                    t_hdf5(i_tny) = arg2(1)
                    nb_hdf5(i_tny) = arg2(2)
                    y_q_hdf5(i_tny) = arg2(3)
@@ -2093,7 +2093,7 @@ subroutine get_eos_table(iwr)
                    else
                      b = tabMin%b * (d_b**(j_b-1))
                    end if
-#if defined hdf5
+#if defined have_hdf5
                    ! magnetic field not yet implemented for HDF5 ou,arg3tput
 #endif
                    !++++++++++++++++++++++++++++++++++++++
@@ -2139,7 +2139,7 @@ subroutine get_eos_table(iwr)
                          endif
                        else
                          ! HDF5
-#if defined hdf5
+#if defined have_hdf5
                          !2017/05/23
                          t_hdf5(j_t) = arg2(1)
                          nb_hdf5(j_nb) = arg2(2)
@@ -2194,14 +2194,10 @@ subroutine get_eos_table(iwr)
      close(unit=iunit2)
    else
      ! HDF5
-#if defined hdf5
+#if defined have_hdf5
      write(*,*)'call writing HDF5 table'
      call write_hdf5()
      call close_hdf5
-     ! testing purposes
-     call read_hdf5()
-     call close_hdf5
-     !****************
 #endif
    end if
    close(unit=iunit)
@@ -5492,6 +5488,7 @@ end do
 
 call init_eos_table_term(iwr,iterm,iinit)
 
+
 select case (iterm)
 case (1)
    call init_quant()
@@ -5967,7 +5964,7 @@ if (inew == 1) then
    end if
 
    iout = 1 ! Default is ASCII format
-#if defined hdf5
+#if defined have_hdf5
    write(*,*)
    write(*,*) ' Please select the format of the file eos.table from'
    write(6,*) ' 1: ASCII, else: HDF5'
@@ -6481,7 +6478,7 @@ SUBROUTINE get_eos_table_term(iwr,iinit)
  use m_get_tables
 implicit none
 integer :: iwr,iinit,nbl,iunit2,iunit3,iunit4,ierror,iv,ibeta,iyq,&
-     ivar(4),idxp(dim_ip),idxq(dim_iq),idxm(dim_im)
+     ivar(4),idxp(dim_ip),idxq(dim_iq),idxm(dim_im),init_flg
 double precision :: timei,timef
 
 
@@ -6538,8 +6535,9 @@ if (ierror /= 0) then
 end if
 close(unit=iunit4)
 
+init_flg = iinit
 
-call read_eos_4_tables(iwr,nbl,iyq,ii_thermo=2,ii_tynb=0,unit=0,iinit=0)
+call read_eos_4_tables(iwr,nbl,iyq,ii_thermo=2,ii_tynb=0,unit=0,iinit=init_flg)
 
 call get_diff_rules()
 

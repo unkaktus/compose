@@ -1,5 +1,5 @@
 MODULE precision
-
+      
   integer,parameter :: dp = selected_real_kind(15)
 
 END MODULE precision
@@ -19,16 +19,16 @@ MODULE hdfparameters
   integer,allocatable :: index_thermo(:),index_thermo_add(:),index_err(:)
   integer, allocatable :: index_yi(:),index_av(:),index_micro(:)
 
-contains
+contains 
 
   subroutine initialise_hdf5(n_nb,n_t,n_yq)
 
-   use general_var, only : tabulation_schema
-    USE compose_internal
+    use general_var, only : tabulation_schema
+    USE compose_internal 
     IMPLICIT NONE
-
-    integer :: n_nb,n_t,n_yq
-
+    
+    integer n_nb,n_t,n_yq
+    
     m_nb = n_nb
     n_temp = n_t
     o_y_q = n_yq
@@ -111,237 +111,116 @@ contains
     y_q_hdf5 = 0._dp
   end subroutine initialise_hdf5
 
-  subroutine write_hdf5(itab)
+  subroutine write_hdf5
 
+    use general_var, only : tabulation_schema
     USE compose_internal
+    use hdf5
+    use modhdf5
+
     IMPLICIT NONE
+    
+    integer n4d(4)
+    integer(hid_t) ::  h5id, h5file_write
+    character(LEN=15) :: file_write = 'eoscompose.h5'
+    
+    call hdf5_init()
+    call hdf5_create_file(file_write,h5file_write)
 
-    integer itab
-
-    integer :: openfile = 1 ! =1 if file for writing hdf5 has not been opened
-                            ! =2 if file is already open
-                            ! the temperature, density and y_q arrays are
-                            ! only written the first time (i.e. openfile = 1)
+    call hdf5_create_group(h5file_write,'Parameters', h5id)
+    call hdf5_write_attr(h5id,'pointsnb',m_nb)
+    call hdf5_write_attr(h5id,'tabulation_scheme',tabulation_schema)
+    call hdf5_write_attr(h5id,'pointst',n_temp)
+    call hdf5_write_attr(h5id,'pointsyq',o_y_q)
+       
+    call hdf5_write_data(h5id,'nb',m_nb,nb_hdf5)
+    if(tabulation_schema.eq.0) then
+       call hdf5_write_data(h5id,'t',m_nb,t_hdf5)
+       call hdf5_write_data(h5id,'yq',m_nb,y_q_hdf5)
+    else
+       call hdf5_write_data(h5id,'t',n_temp,t_hdf5)
+       call hdf5_write_data(h5id,'yq',o_y_q,y_q_hdf5)
+    end if
+    call hdf5_close_group(h5id)
+    n4d(1) = m_nb
+    n4d(2) = n_temp
+    n4d(3) = o_y_q
 
     write(*,*) 'writing ',n_qty,' thermodynamic quantities into file '
 
-    call hdf5_write_thermo(m_nb,n_temp,o_y_q, n_qty, nb_hdf5, t_hdf5, y_q_hdf5, &
-                             thermo_hdf5,index_thermo,openfile,itab)
-    openfile = 2
-
+    if(n_qty.ne.0) then ! write thermo quantities
+       call hdf5_create_group(h5file_write,'Thermo_qty', h5id)
+       call hdf5_write_attr(h5id,'pointsqty',n_qty)
+       n4d(4) = n_qty
+       call hdf5_write_data(h5id,'thermo',n4d,thermo_hdf5)
+       call hdf5_write_data(h5id,'index_thermo',n_qty,index_thermo)
+       call hdf5_close_group(h5id)
+    end if
+    
     write(*,*) 'writing ',n_add,' additional thermodynamic quantities into file'
-    call hdf5_write_thermo_add(m_nb,n_temp,o_y_q, n_add, nb_hdf5, t_hdf5, y_q_hdf5,&
-                             thermo_hdf5_add,index_thermo_add,openfile,itab)
+    if(n_add.ne.0) then
+       call hdf5_create_group(h5file_write,'Thermo_add', h5id)
+       call hdf5_write_attr(h5id,'pointsadd',n_add)
+       n4d(4) = n_add
+       call hdf5_write_data(h5id,'thermo_add',n4d,thermo_hdf5_add)
+       call hdf5_write_data(h5id,'index_thermo_add',n_add,index_thermo_add)
+       call hdf5_close_group(h5id)
+    end if
 
     write(*,*) 'writing ',n_p,' pairs into file'
 
-    call hdf5_write_compo_p(m_nb,n_temp,o_y_q, n_p, nb_hdf5, t_hdf5, y_q_hdf5, &
-                     yi_hdf5,index_yi,openfile,itab)
+    if(n_p.ne.0) then
+       call hdf5_create_group(h5file_write,'Composition_pairs', h5id)
+       call hdf5_write_attr(h5id,'pointspairs',n_p)
+       n4d(4) = n_p
+       call hdf5_write_data(h5id,'yi',n4d,yi_hdf5)
+       call hdf5_write_data(h5id,'index_yi',n_p,index_yi)
+       call hdf5_close_group(h5id)
+    end if
 
     write(*,*) 'writing ',n_q,' quadruples into file'
 
-    call hdf5_write_compo_q(m_nb,n_temp,o_y_q, n_q, nb_hdf5, t_hdf5, y_q_hdf5, &
-                              yav_hdf5,aav_hdf5,zav_hdf5,nav_hdf5,index_av,openfile,itab)
+    if(n_q.ne.0) then
+       call hdf5_create_group(h5file_write,'Composition_quadrupels', h5id)
+       call hdf5_write_attr(h5id,'pointsav',n_q)
+       n4d(4) = n_q
+       call hdf5_write_data(h5id,'yav',n4d,yav_hdf5)
+       call hdf5_write_data(h5id,'aav',n4d,aav_hdf5)
+       call hdf5_write_data(h5id,'zav',n4d,zav_hdf5)
+       call hdf5_write_data(h5id,'nav',n4d,nav_hdf5)
+       call hdf5_write_data(h5id,'index_av',n_q,index_av)
+       call hdf5_close_group(h5id)
+    end if
+
+
     write(*,*) 'writing ',n_m,' microscopic quantities into file'
-    call hdf5_write_micro(m_nb,n_temp,o_y_q, n_m, nb_hdf5, t_hdf5, y_q_hdf5, &
-                              micro_hdf5,index_micro,openfile,itab)
+
+    if(n_m.ne.0) then
+       call hdf5_create_group(h5file_write,'Micro_qty', h5id)
+       call hdf5_write_attr(h5id,'pointsmicro',n_m)
+       n4d(4) = n_m
+       call hdf5_write_data(h5id,'micro',n4d,micro_hdf5)
+       call hdf5_write_data(h5id,'index_micro',n_q,index_micro)
+       call hdf5_close_group(h5id)
+    end if
 
 
     write(*,*) 'writing ',n_err,' error quantities into file'
-    call hdf5_write_err(m_nb,n_temp,o_y_q, n_err, nb_hdf5, t_hdf5, y_q_hdf5, &
-                     err_hdf5,index_err,openfile,itab)
+
+    if(n_err.ne.0) then
+       call hdf5_create_group(h5file_write,'Error_qty', h5id)
+       call hdf5_write_attr(h5id,'pointserr',n_err)
+       n4d(4) = n_err
+       call hdf5_write_data(h5id,'error',n4d,err_hdf5)
+       call hdf5_write_data(h5id,'index_err',n_err,index_err)
+       call hdf5_close_group(h5id)
+    end if
+
+    call hdf5_close_file(h5file_write)
 
 
   end subroutine write_hdf5
 
-
-  subroutine read_hdf5()
-   use general_var, only : tabulation_schema
-   use compose_internal
-    IMPLICIT NONE
-
-
-    integer :: openfile = 1 ! =1 if file for reading hdf5 has not been opened
-                            ! =2 if file is already open
-                            ! the temperature, density and y_q arrays are
-                            ! only read the first time (i.e. openfile = 1)
-    character(30) qty_name,index_name
-
-    integer m_nb_rd,n_temp_rd,o_y_q_rd,n_qty_rd,n_add_rd,n_p_rd,n_q_rd,n_m_rd,n_err_rd,i,j,k,i_tab_rd
-
-    ! First read the number of different quantities stored
-
-    call hdf5_read_dimensions(m_nb_rd,n_temp_rd,o_y_q_rd,n_qty_rd,n_add_rd,&
-                              n_p_rd,n_q_rd,n_m_rd,n_err_rd,i_tab_rd,openfile)
-
-    IF(tabulation_schema.ne.i_tab_rd) then
-       write(*,*) 'error reading file, i_tab is',i_tab_rd,' not ',tabulation_schema
-       stop
-    end IF
-
-    ! If necessary you can check here if the numbers read are in agreement
-    ! with your expectation. If not, just initialise the dimensions
-    ! For the moment we use it for testing purposes, thus we check that
-    ! everything has the correct dimensions
-    IF(m_nb.ne.m_nb_rd) then
-       write(*,*) 'error reading the number of points in nb',m_nb,m_nb_rd
-       stop
-    end IF
-    IF(tabulation_schema.eq.0) then
-       IF(m_nb.ne.n_temp_rd) then
-          write(*,*) 'error reading the number of points in T',m_nb,n_temp_rd
-          stop
-       end IF
-    else
-       IF(n_temp.ne.n_temp_rd) then
-          write(*,*) 'error reading the number of points in T',n_temp,n_temp_rd
-          stop
-       end IF
-    end IF
-    IF(tabulation_schema.eq.0) then
-       IF(m_nb.ne.o_y_q_rd) then
-          write(*,*) 'error reading the number of points in yq',m_nb,o_y_q_rd
-          stop
-       end IF
-    else
-       IF(o_y_q.ne.o_y_q_rd) then
-          write(*,*) 'error reading the number of points in yq',o_y_q,o_y_q_rd
-          stop
-       end IF
-    end IF
-    IF(n_qty.ne.n_qty_rd) then
-       write(*,*) 'error reading the number of thermodynamical quantities',n_qty,n_qty_rd
-       stop
-    end IF
-    IF(n_add.ne.n_add_rd) then
-       write(*,*) 'error reading the number of additional thermo quantities',n_add,n_add_rd
-       stop
-    end IF
-    IF(n_p.ne.n_p_rd) then
-       write(*,*) 'error reading the number of pairs',n_p,n_p_rd
-       stop
-    end IF
-    IF(n_q.ne.n_q_rd) then
-       write(*,*) 'error reading the number of quadruples',n_q,n_q_rd
-       stop
-    end IF
-    IF(n_m.ne.n_m_rd) then
-       write(*,*) 'error reading the number of microscopic quantities',n_m,n_m_rd
-       stop
-    end IF
-    IF(n_err.ne.n_err_rd) then
-       write(*,*) 'error reading the number of error quantities',n_err,n_err_rd
-       stop
-    end IF
-
-    ! Part not used for the moment
-!!$    m_nb = m_nb_rd
-!!$    n_temp = n_temp_rd
-!!$    o_y_q = o_y_q_rd
-!!$    n_qty = n_qty_rd
-!!$    n_add = n_add_rd
-!!$    n_p = n_p_rd
-!!$    n_q = n_q_rd
-!!$    n_m = n_m_rd
-!!$    n_err = n_err_rd
-
-    IF(tabulation_schema == 0) then
-       call initialise_hdf5(m_nb_rd,1,1)
-    else
-       call initialise_hdf5(m_nb_rd,n_temp_rd,o_y_q_rd)
-    end IF
-
-
-    IF(n_qty.ne.0) then
-       write(*,*) 'reading ',n_qty,' thermodynamic quantities from file'
-       qty_name = 'thermo'
-       qty_name = trim(qty_name)//CHAR(0)
-       index_name = 'index_thermo'
-       index_name = trim(index_name)//CHAR(0)
-       call hdf5_read(nb_hdf5, t_hdf5, y_q_hdf5, &
-                             thermo_hdf5,index_thermo,openfile,&
-                            qty_name,index_name)
-
-       openfile = 2
-
-    end IF
-
-    IF(n_add.ne.0) then
-       write(*,*) 'reading ',n_add,' additional thermodynamic quantities from file'
-       qty_name = 'thermo_add'
-       qty_name = trim(qty_name)//CHAR(0)
-       index_name = 'index_thermo_add'
-       index_name = trim(index_name)//CHAR(0)
-       call hdf5_read(nb_hdf5, t_hdf5, y_q_hdf5, &
-                             thermo_hdf5_add,index_thermo_add,openfile,&
-                            qty_name,index_name)
-       openfile = 2
-    end IF
-
-    IF(n_p.ne.0) then
-       write(*,*) 'reading ',n_p,' pairs from file'
-       qty_name = 'yi'
-       qty_name = trim(qty_name)//CHAR(0)
-       index_name = 'index_yi'
-       index_name = trim(index_name)//CHAR(0)
-       call hdf5_read(nb_hdf5, t_hdf5, y_q_hdf5, &
-                             yi_hdf5,index_yi,openfile,&
-                            qty_name,index_name)
-       openfile = 2
-    end IF
-
-    IF(n_q.ne.0) then
-       write(*,*) 'reading ',n_q,' quadruples from file'
-       call hdf5_read_av(nb_hdf5, t_hdf5, y_q_hdf5, &
-                              yav_hdf5,aav_hdf5,zav_hdf5,nav_hdf5,index_av,openfile)
-       openfile = 2
-    end IF
-
-    IF(n_m.ne.0) then
-       write(*,*) 'reading ',n_m,' microscopic quantities from file'
-       qty_name = 'micro'
-       qty_name = trim(qty_name)//CHAR(0)
-       index_name = 'index_micro'
-       index_name = trim(index_name)//CHAR(0)
-       call hdf5_read(nb_hdf5, t_hdf5, y_q_hdf5, &
-                             micro_hdf5,index_micro,openfile,&
-                            qty_name,index_name)
-       openfile = 2
-    end IF
-
-
-    IF(n_err.ne.0) then
-       write(*,*) 'reading ',n_err,' error quantities from file'
-       qty_name = 'error'
-       qty_name = trim(qty_name)//CHAR(0)
-       index_name = 'index_err'
-       index_name = trim(index_name)//CHAR(0)
-       call hdf5_read(nb_hdf5, t_hdf5, y_q_hdf5, &
-                             err_hdf5,index_err,openfile,&
-                            qty_name,index_name)
-       openfile = 2
-    end IF
-
-    open(33,file='readtest.d',status='unknown')
-    IF(tabulation_schema == 0) then
-       DO i = 1,m_nb
-          write(33,*) nb_hdf5(i),t_hdf5(i),y_q_hdf5(i),thermo_hdf5(i,1,1,1:n_qty),yi_hdf5(i,1,1,1:n_p),&
-            aav_hdf5(i,1,1,1:n_q),zav_hdf5(i,1,1,1:n_q),yav_hdf5(i,1,1,1:n_q),nav_hdf5(i,1,1,1:n_q)&
-            ,micro_hdf5(i,1,1,1:n_m),err_hdf5(i,1,1,1:n_err)
-       end DO
-    else
-       DO i = 1,n_temp
-          DO j = 1,m_nb
-             DO k = 1,o_y_q
-                write(33,*) t_hdf5(i),nb_hdf5(j),y_q_hdf5(k),thermo_hdf5(j,i,k,1:n_qty),yi_hdf5(j,i,k,1:n_p),&
-            aav_hdf5(j,i,k,1:n_q),zav_hdf5(j,i,k,1:n_q),yav_hdf5(j,i,k,1:n_q),nav_hdf5(j,i,k,1:n_q)&
-            ,micro_hdf5(j,i,k,1:n_m),err_hdf5(j,i,k,1:n_err)
-             end DO
-          end DO
-       end DO
-    end IF
-
-  end subroutine read_hdf5
 
   subroutine close_hdf5
 
@@ -369,3 +248,5 @@ contains
   end subroutine close_hdf5
 
 end MODULE hdfparameters
+
+
