@@ -41,7 +41,7 @@ endif
 ifeq ($(HDF5),1)
    HDF5_LIB = -lhdf5
    HDF5_C = -Dhave_hdf5
-   FC = h5pfc
+   FC = h5fc
    FC_FLAGS = -O3   -cpp -fopenmp $(DEBUG) $(HDF5_C)
 else
    HDF5_LIB =
