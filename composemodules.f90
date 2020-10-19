@@ -76,7 +76,7 @@ module compose_internal
  implicit none
 
  integer, parameter :: dim_err = 100, dim_ip = 25, dim_iq = 10,&
-   &                   dim_im = 10, dim_ia = 5, nerr_max = 8
+   &                   dim_im = 20, dim_ia = 5, nerr_max = 8
 
  integer :: eos_dim, idx_ex(0:3), idx_ipl(3), &
    &        dim_a, dim_idx(3), min_idx(4), &
