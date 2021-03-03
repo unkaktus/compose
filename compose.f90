@@ -900,8 +900,11 @@ subroutine get_eos_report(iwr)
    nqty,iphase(dim_q),nphase,nphase_miss,&
    nqtyp,np_miss,nqtyq,nq_miss,nqtym,nm_miss,&
    distr(2,-1:dim_d),ipl(1:3),idxe(2,3)
+ integer :: in_lorene,count_lorene
+ double precision :: minimum_enthalpy, enthalpy
  double precision :: nsat,bsat,k,kp,j,l,ksym,tmp,dfa_max(2),&
    dlnt,f1,f2,fn,en,t,nb,yq,b
+ logical :: first_in
 #ifdef DEBUG
  double precision :: timei,timef
 #endif
@@ -1137,6 +1140,11 @@ subroutine get_eos_report(iwr)
 
  open(unit=23,file='eos.beta',&
    status='unknown',action='write',iostat=ierror)
+! create beta-equilibrium files for run with Lorene (check that entalpy is monotonic)
+ open(unit=24,file='eos.nb.ns',&
+   status='unknown',action='write',iostat=ierror)
+ open(unit=25,file='eos.thermo.ns',&
+   status='unknown',action='write',iostat=ierror)
  ! check for dependence on nb and yq
  if (inbyq == 1) then
    if (incl_l /= 1) then
@@ -1173,13 +1181,53 @@ subroutine get_eos_report(iwr)
          if (dim_idx(iq) > 0) then
            ip = jmap(2)
            if (ip > 0) then
-             do in=1,dim_idx(ip),1
-               nb = tab_para(in,ip)
-               !++++++++++++++++++++++++++++++
-               call get_eos(t,nb,yq,b,ipl,1,0,eos_thermo)
-               !++++++++++++++++++++++++++++++
-               if (yq > 0.d00) then
-                 write(23,*) nb,yq,(eos_thermo(6)+1.d00)*m_n*nb,eos_thermo(1)
+              minimum_enthalpy = 10.d0 ! initialize
+              ! look for minimum enthalpy to cut the low density entries (if necessary)
+              ! which are non-monotonic
+              in_lorene = 0
+              count_lorene = 0
+              first_in = .true.
+              enthalpy_loop: do in=1,dim_idx(ip),1
+                 nb = tab_para(in,ip)
+                 !++++++++++++++++++++++++++++++
+                 call get_eos(t,nb,yq,b,ipl,1,0,eos_thermo)
+                 !++++++++++++++++++++++++++++++
+                 if (yq > 0.d00) then
+                    enthalpy = eos_thermo(6) + 1.d0 + eos_thermo(1)/(m_n*nb)
+                    if(first_in) then
+                       if((minimum_enthalpy.ne.10.d0).and.(enthalpy.ge.minimum_enthalpy)) then
+                          in_lorene = in - 1
+                          count_lorene = count_lorene + 2
+                          first_in = .false.
+                       end if
+                       minimum_enthalpy = enthalpy
+                    else
+                       count_lorene = count_lorene + 1
+                    end if
+                 end if
+              end do enthalpy_loop
+              if(in_lorene.gt.0) then
+                 write(24,*) 1
+                 write(24,*) count_lorene
+                 write(25,*) m_n,m_p,1
+              end if
+              count_lorene = 0
+              do in=1,dim_idx(ip),1
+                 nb = tab_para(in,ip)
+                 !++++++++++++++++++++++++++++++
+                 call get_eos(t,nb,yq,b,ipl,1,0,eos_thermo)
+                 !++++++++++++++++++++++++++++++
+                 if (yq > 0.d00) then
+                    enthalpy = eos_thermo(6) + 1.d0 + eos_thermo(1)/(m_n*nb)
+
+                    if(in.ge.in_lorene) then
+                       count_lorene = count_lorene + 1
+                       write(24,*) nb
+                       write(25,*) 1,count_lorene,1,eos_thermo(1)/nb,&
+                            eos_thermo(2),eos_thermo(3)/m_n,eos_thermo(4)/m_n,&
+                            eos_thermo(5)/m_n,eos_thermo(6),eos_thermo(7),2,yq,enthalpy
+                    end if
+                    write(23,*) nb,yq,(eos_thermo(6)+1.d00)*m_n*nb,eos_thermo(1)
                else
                  write(*,*) 'warning: no beta-equilibrium found for ',&
                    'baryon density n_b=',nb,'fm^-3'
@@ -1204,6 +1252,8 @@ subroutine get_eos_report(iwr)
  end if
 
  close (unit=23)
+ close (unit=24)
+ close (unit=25)
 
  ! thermodynamic consistency check and distribution of errors
  ! delta(f/n)/(f/n) and delta(e/n)/(e/n)
