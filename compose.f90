@@ -1193,7 +1193,7 @@ subroutine get_eos_report(iwr)
                  call get_eos(t,nb,yq,b,ipl,1,0,eos_thermo)
                  !++++++++++++++++++++++++++++++
                  if (yq > 0.d00) then
-                    enthalpy = eos_thermo(6) + 1.d0 + eos_thermo(1)/(m_n*nb)
+                    enthalpy = eos_thermo(7) + 1.d0 + eos_thermo(1)/(m_n*nb)
                     if(first_in) then
                        if((minimum_enthalpy.ne.10.d0).and.(enthalpy.ge.minimum_enthalpy)) then
                           in_lorene = in - 1
@@ -1204,6 +1204,7 @@ subroutine get_eos_report(iwr)
                     else
                        count_lorene = count_lorene + 1
                     end if
+
                  end if
               end do enthalpy_loop
               if(in_lorene.gt.0) then
@@ -1212,14 +1213,14 @@ subroutine get_eos_report(iwr)
                  write(25,*) m_n,m_p,1
               end if
               count_lorene = 0
+
               do in=1,dim_idx(ip),1
                  nb = tab_para(in,ip)
                  !++++++++++++++++++++++++++++++
                  call get_eos(t,nb,yq,b,ipl,1,0,eos_thermo)
                  !++++++++++++++++++++++++++++++
                  if (yq > 0.d00) then
-                    enthalpy = eos_thermo(6) + 1.d0 + eos_thermo(1)/(m_n*nb)
-
+                    enthalpy = eos_thermo(7) + 1.d0 + eos_thermo(1)/(m_n*nb)
                     if(in.ge.in_lorene) then
                        count_lorene = count_lorene + 1
                        write(24,*) nb
