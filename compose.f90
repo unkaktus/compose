@@ -1184,6 +1184,7 @@ subroutine get_eos_report(iwr)
               minimum_enthalpy = 10.d0 ! initialize
               ! look for minimum enthalpy to cut the low density entries (if necessary)
               ! which are non-monotonic
+              ! and at the highest densities, too
               in_lorene = 0
               count_lorene = 0
               first_in = .true.
@@ -1201,8 +1202,12 @@ subroutine get_eos_report(iwr)
                           first_in = .false.
                        end if
                        minimum_enthalpy = enthalpy
+
                     else
-                       count_lorene = count_lorene + 1
+                       if(enthalpy.gt.minimum_enthalpy) then
+                          count_lorene = count_lorene + 1
+                          minimum_enthalpy = enthalpy
+                       end if
                     end if
 
                  end if
@@ -1213,7 +1218,8 @@ subroutine get_eos_report(iwr)
                  write(25,*) m_n,m_p,1
               end if
               count_lorene = 0
-
+              minimum_enthalpy = 0.d0
+              
               do in=1,dim_idx(ip),1
                  nb = tab_para(in,ip)
                  !++++++++++++++++++++++++++++++
@@ -1221,12 +1227,16 @@ subroutine get_eos_report(iwr)
                  !++++++++++++++++++++++++++++++
                  if (yq > 0.d00) then
                     enthalpy = eos_thermo(7) + 1.d0 + eos_thermo(1)/(m_n*nb)
+                    write(*,*) 'enthalpy, densiyt',real(enthalpy),real(nb)
                     if(in.ge.in_lorene) then
-                       count_lorene = count_lorene + 1
-                       write(24,*) nb
-                       write(25,*) 1,count_lorene,1,eos_thermo(1)/nb,&
-                            eos_thermo(2),eos_thermo(3)/m_n,eos_thermo(4)/m_n,&
-                            eos_thermo(5)/m_n,eos_thermo(6),eos_thermo(7),2,yq,enthalpy
+                       if(enthalpy.gt.minimum_enthalpy) then
+                          count_lorene = count_lorene + 1
+                          write(24,*) nb
+                          write(25,*) 1,count_lorene,1,eos_thermo(1)/nb,&
+                               eos_thermo(2),eos_thermo(3)/m_n,eos_thermo(4)/m_n,&
+                               eos_thermo(5)/m_n,eos_thermo(6),eos_thermo(7),2,yq,enthalpy
+                          minimum_enthalpy = enthalpy
+                       end if
                     end if
                     write(23,*) nb,yq,(eos_thermo(6)+1.d00)*m_n*nb,eos_thermo(1)
                else
