@@ -30,10 +30,10 @@ EXEC_TEST_KAPPA = $(NAME_READ_KAPPA)
 # default flag settings (HDF5 = 0, BOUNDCHECK = 0)
 # attention, the test codes need HDF5
 
-BOUNDCHECK = 0
+BOUNDCHECK = 1
 HDF5 = 1
 ifeq ($(BOUNDCHECK),1)
-   DEBUG = -g -DDEBUG -pg -debug -fbacktrace -fbounds-check -ffpe-trap=zero,overflow,underflow
+   DEBUG = -g -DDEBUG -pg -fbacktrace -fbounds-check -ffpe-trap=zero,overflow,underflow
 else
    DEBUG = 
 endif

@@ -1232,7 +1232,7 @@ subroutine get_eos_report(iwr)
                        if(enthalpy.gt.minimum_enthalpy) then
                           count_lorene = count_lorene + 1
                           write(24,*) nb
-                          write(25,*) 1,count_lorene,1,eos_thermo(1)/nb,&
+                          write(25,*) 0,count_lorene,1,eos_thermo(1)/nb,&
                                eos_thermo(2),eos_thermo(3)/m_n,eos_thermo(4)/m_n,&
                                eos_thermo(5)/m_n,eos_thermo(6),eos_thermo(7),2,yq,enthalpy
                           minimum_enthalpy = enthalpy
@@ -2615,8 +2615,17 @@ subroutine get_eos_beta(y,ipl,ierr,i_entr, eos_thermo)
  f_max = eos_thermo(5)
 
  if ((f_min*f_max > 0.d00).or.(y_min > y_max)) then
-   ! no beta equilibrium
-   y = -2.d00
+    ! no beta equilibrium
+    if(y_min>y_max) then
+       y = -2.d00
+    else
+       y = y_min ! return the value at the lowest Y entry of the table
+       arg(3) = y
+       !++++++++++++++++++++++++++++++++++++
+       call get_eos_sub_new(ipl,ierr,0,1,i_entr,eos_thermo)
+       !++++++++++++++++++++++++++++++++++++
+    end if
+    
    return
  else
 
@@ -3642,6 +3651,9 @@ subroutine eos_interpol_d3(m,q,ipl,inmp,ibeta,dim_ipl, eosthermo_out)
    first = .false.
  end if
 
+ ! initialisation of mat2
+ mat2 = 0.d0
+ 
  ! interpolation for three dimensional table
  ! standard choice: two-dimensional interpolation in ik(1) and ik(2)
  !                  one-dimensional interpolation in ik(3)
@@ -3777,7 +3789,7 @@ subroutine eos_interpol_d3(m,q,ipl,inmp,ibeta,dim_ipl, eosthermo_out)
        mat(iq,idx1(igp),idx2(igp)) = dh(0)
        !2017/05/22
        if (iq == 6) then
-         mat2(idx1(igp),idx2(igp),0:2) = dh(0:2)
+          mat2(idx1(igp),idx2(igp),0:2) = dh(0:2)
        end if
      end do
 
@@ -3804,7 +3816,7 @@ subroutine eos_interpol_d3(m,q,ipl,inmp,ibeta,dim_ipl, eosthermo_out)
    if (idx_thermo(6) > 0) then
      !! !$OMP DO PRIVATE(is,dg)
      do is=0,2
-       call make_interp_xy(ipl,ik,qx,qy,dg,1,mat2(-4:5,-4:5,is))
+        call make_interp_xy(ipl,ik,qx,qy,dg,1,mat2(-4:5,-4:5,is))
        ! call get_derivatives(ipl,ik)
        ! call get_coefficients()
        ! call get_interpol_xy(qx,qy,dg,1)
@@ -5132,7 +5144,7 @@ subroutine make_interp_xy(ipl,ik,qx,qy,dg,order,df00)
      do iq=-4,4,1
        i1p = i1+iq
        if ((i1p >= -4).and.(i1p <= 5)) then
-         df(1,0,i1,i2) = df(1,0,i1,i2)+df(0,0,i1p,i2)*d1x(i1,i2,iq)
+          df(1,0,i1,i2) = df(1,0,i1,i2)+df(0,0,i1p,i2)*d1x(i1,i2,iq)
        end if
      end do
      ! y
