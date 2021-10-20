@@ -1227,7 +1227,7 @@ subroutine get_eos_report(iwr)
                  !++++++++++++++++++++++++++++++
                  if (yq > 0.d00) then
                     enthalpy = eos_thermo(7) + 1.d0 + eos_thermo(1)/(m_n*nb)
-                    write(*,*) 'enthalpy, densiyt',real(enthalpy),real(nb)
+!                    write(*,*) 'enthalpy, density',real(enthalpy),real(nb)
                     if(in.ge.in_lorene) then
                        if(enthalpy.gt.minimum_enthalpy) then
                           count_lorene = count_lorene + 1
@@ -3088,12 +3088,14 @@ if (alloc_status /= 0) then
    ierr = ierr+1
    if (ierr < dim_err) error_msg(ierr) = 140
 end if
+mat = 0.d0
 
 allocate(mat3(dim_ipl,-4:5,-4:5,3),stat=alloc_status)
 if (alloc_status /= 0) then
    ierr = ierr+1
    if (ierr < dim_err) error_msg(ierr) = 141
 end if
+mat3 = 0.d0
 
 allocate(vp_compo(np_max),stat=alloc_status)
 if (alloc_status /= 0) then
@@ -3621,12 +3623,15 @@ subroutine eos_interpol_d3(m,q,ipl,inmp,ibeta,dim_ipl, eosthermo_out)
      ierr = ierr+1
      if (ierr < dim_err) error_msg(ierr) = 140
    end if
-
+   mat = 0.d0
+   
    allocate(mat3(dim_ipl,-4:5,-4:5,3),stat=alloc_status)
    if (alloc_status /= 0) then
-     ierr = ierr+1
-     if (ierr < dim_err) error_msg(ierr) = 141
+      ierr = ierr+1
+      if (ierr < dim_err) error_msg(ierr) = 141
    end if
+   mat3 = 0.d0
+   
    !2017/05/22
    allocate(vp_compo(np_max),stat=alloc_status)
    if (alloc_status /= 0) then
@@ -4260,12 +4265,14 @@ if (alloc_status /= 0) then
    ierr = ierr+1
    if (ierr < dim_err) error_msg(ierr) = 170
 end if
+mat = 0.d0
 
 allocate(mat3(dim_ipl,-4:5,-4:5,3),stat=alloc_status)
 if (alloc_status /= 0) then
    ierr = ierr+1
    if (ierr < dim_err) error_msg(ierr) = 171
 end if
+mat3 = 0.d0
 
 allocate(vp_compo(np_max),stat=alloc_status)
 if (alloc_status /= 0) then
