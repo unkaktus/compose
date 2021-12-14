@@ -2091,6 +2091,10 @@ subroutine get_eos_table(iwr)
                      thermo_hdf5_add(i_tny,1,1,1:n_add) = eos_thermo_add(1:n_add)
                      index_thermo_add(1:n_add) = idx_add(1:n_add)
                    end if
+                   if(n_df.ne.0) then
+                     deriv_hdf5(i_tny,1,1,1:n_df) = eos_df(idx_df(1:n_df))
+                     index_deriv(1:n_df) = idx_df(1:n_df)
+                   end if
                    if(n_p.ne.0) then
                      yi_hdf5(i_tny,1,1,1:n_p) = eos_compo_p(1:n_p)
                      index_yi(1:n_p) = idx_p(1:n_p)
@@ -2213,6 +2217,10 @@ subroutine get_eos_table(iwr)
                            thermo_hdf5_add(j_nb,j_t,j_yq,1:n_add) = eos_thermo_add(1:n_add)
                            index_thermo_add(1:n_add) = idx_add(1:n_add)
                          end IF
+                         if(n_df.ne.0) then
+                            deriv_hdf5(j_nb,j_t,j_yq,1:n_df) = eos_df(idx_df(1:n_df))
+                            index_deriv(1:n_df) = idx_df(1:n_df)
+                         end if
                          IF(n_p.ne.0) then
                            yi_hdf5(j_nb,j_t,j_yq,1:n_p) = eos_compo_p(1:n_p)
                            index_yi(1:n_p) = idx_p(1:n_p)

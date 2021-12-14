@@ -12,11 +12,11 @@ MODULE hdfparameters
   real(dp), allocatable :: nb_hdf5(:),t_hdf5(:),y_q_hdf5(:)
   integer :: m_nb,n_temp,o_y_q
 
-  real(dp), allocatable :: thermo_hdf5(:,:,:,:), thermo_hdf5_add(:,:,:,:)
+  real(dp), allocatable :: thermo_hdf5(:,:,:,:), thermo_hdf5_add(:,:,:,:),deriv_hdf5(:,:,:,:)
   real(dp), allocatable :: yi_hdf5(:,:,:,:),aav_hdf5(:,:,:,:),zav_hdf5(:,:,:,:),yav_hdf5(:,:,:,:)
   real(dp), allocatable :: nav_hdf5(:,:,:,:)
   real(dp), allocatable :: micro_hdf5(:,:,:,:),err_hdf5(:,:,:,:)
-  integer,allocatable :: index_thermo(:),index_thermo_add(:),index_err(:)
+  integer,allocatable :: index_thermo(:),index_thermo_add(:),index_err(:),index_deriv(:)
   integer, allocatable :: index_yi(:),index_av(:),index_micro(:)
 
 contains 
@@ -50,6 +50,15 @@ contains
        index_thermo_add = 0
     else
        write(*,*) 'n_add equal to zero, no additional thermodynamic quantities'
+    end IF
+
+    IF(n_df.ne.0) then
+       allocate(deriv_hdf5(m_nb,n_temp,o_y_q,n_df))
+       deriv_hdf5 = 0._dp
+       allocate(index_deriv(n_df))
+       index_deriv = 0
+    else
+       write(*,*) 'n_df equal to zero, no derivative quantities'
     end IF
 
 ! memory allocation for the data arrays, composition
@@ -167,6 +176,18 @@ contains
        call hdf5_close_group(h5id)
     end if
 
+
+    write(*,*) 'writing ',n_df,' derivative quantities into file'
+    if(n_df.ne.0) then ! write derivative quantities
+       call hdf5_create_group(h5file_write,'deriv_qty', h5id)
+       call hdf5_write_attr(h5id,'pointsderiv',n_df)
+       n4d(4) = n_df
+       call hdf5_write_data(h5id,'deriv',n4d,deriv_hdf5)
+       call hdf5_write_data(h5id,'index_deriv',n_df,index_deriv)
+       call hdf5_close_group(h5id)
+    end if
+
+
     write(*,*) 'writing ',n_p,' pairs into file'
 
     if(n_p.ne.0) then
@@ -228,6 +249,7 @@ contains
 
     IF(allocated(thermo_hdf5)) deallocate(thermo_hdf5)
     IF(allocated(thermo_hdf5_add)) deallocate(thermo_hdf5_add)
+    IF(allocated(deriv_hdf5)) deallocate(deriv_hdf5)
     IF(allocated(yi_hdf5)) deallocate(yi_hdf5)
     IF(allocated(yav_hdf5)) deallocate(yav_hdf5)
     IF(allocated(zav_hdf5)) deallocate(zav_hdf5)
@@ -237,6 +259,7 @@ contains
     IF(allocated(err_hdf5)) deallocate(err_hdf5)
     IF(allocated(index_thermo)) deallocate(index_thermo)
     IF(allocated(index_thermo_add)) deallocate(index_thermo_add)
+    IF(allocated(index_deriv)) deallocate(index_deriv)
     IF(allocated(index_err)) deallocate(index_err)
     IF(allocated(index_yi)) deallocate(index_yi)
     IF(allocated(index_av)) deallocate(index_av)
