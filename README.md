@@ -54,10 +54,31 @@ present release of the **CompOSE** tools contains the following files
 mainly by C. Ishizuka, T. Klaehn, M. Marcini, M. Oertel, and S. Typel (contact develop@compose.obspm.fr).
 
 
-INSTALL :
+### INSTALL :
 
 in the normal case type "make" or "make compose"
 
 If you want to build the version running on the WEB APP, type "make compose_for_web"
 
-this is a try
+
+## DEPLOY ON THE WEB
+after the `git push orgin`
+ssh into the web server :
+```
+cd /data2/Supercompose/ComposeDjango/Eos_Tables/code/
+git pull origin
+make clean
+```
+Control that in the Makefile :
+
+``` makefile
+BOUNDCHECK = 0
+HDF5 = 0
+```
+
+Then
+
+``` bash
+make compose_for_web
+```
+On **  composecalc ** the code will not updated up to the chron execution.
