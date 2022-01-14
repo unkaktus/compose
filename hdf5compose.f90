@@ -102,7 +102,7 @@ contains
        err_hdf5 = 0._dp
        index_err = 0
     else
-       write(*,*) 'n_m equal to zero, no error quantities'
+       write(*,*) 'n_err equal to zero, no error quantities'
     end if
 
 
