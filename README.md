@@ -69,16 +69,28 @@ cd /data2/Supercompose/ComposeDjango/Eos_Tables/code/
 git pull origin
 make clean
 ```
-Control that in the Makefile :
 
-``` makefile
-BOUNDCHECK = 0
-HDF5 = 0
+Now you have two options:
+
+1.
+	Add to the begin of th Makefile :
+
+```makefile
+USE_BOUNDCHECK = 0
+USE_HDF5 = 0
 ```
+and then
 
-Then
-
-``` bash
+```bash
 make compose_for_web
 ```
+
+2.
+In a terminal :
+```bash
+export USE_BOUNDCHECK = 0
+export USE_HDF5 = 0
+make compose_for_web
+```
+
 On **  composecalc ** the code will not updated up to the chron execution.
