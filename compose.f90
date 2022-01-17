@@ -2,22 +2,21 @@
 !   Copyright (c) 2013-2022 Stefan Typel, Marco Mancini, Micaela Oertel
 !
 !   This file is part of CompOSE
- !
- !   CompOSE is free software; you can redistribute it and/or modify
- !   it under the terms of the GNU General Public License as published by
- !   the Free Software Foundation; either version 2 of the License, or
- !   (at your option) any later version.
- !
- !   CompOSE is distributed in the hope that it will be useful,
- !   but WITHOUT ANY WARRANTY; without even the implied warranty of
- !   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- !   GNU General Public License for more details.
- !
- !   You should have received a copy of the GNU General Public License
- !   along with CompOSE; if not, write to the Free Software
- !   Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
- !
- !
+!
+!   CompOSE is free software; you can redistribute it and/or modify
+!   it under the terms of the GNU General Public License as published by
+!   the Free Software Foundation; either version 2 of the License, or
+!   (at your option) any later version.
+!
+!   CompOSE is distributed in the hope that it will be useful,
+!   but WITHOUT ANY WARRANTY; without even the implied warranty of
+!   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+!   GNU General Public License for more details.
+!
+!   You should have received a copy of the GNU General Public License
+!   along with CompOSE; if not, write to the Free Software
+!   Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+!
 
 
 !***********************************************************************
@@ -1241,7 +1240,7 @@ subroutine get_eos_report(iwr)
               end if
               count_lorene = 0
               minimum_enthalpy = 0.d0
-              
+
               do in=1,dim_idx(ip),1
                  nb = tab_para(in,ip)
                  !++++++++++++++++++++++++++++++
@@ -2655,7 +2654,7 @@ subroutine get_eos_beta(y,ipl,ierr,i_entr, eos_thermo)
        call get_eos_sub_new(ipl,ierr,0,1,i_entr,eos_thermo)
        !++++++++++++++++++++++++++++++++++++
     end if
-    
+
    return
  else
 
@@ -3654,14 +3653,14 @@ subroutine eos_interpol_d3(m,q,ipl,inmp,ibeta,dim_ipl, eosthermo_out)
      if (ierr < dim_err) error_msg(ierr) = 140
    end if
    mat = 0.d0
-   
+
    allocate(mat3(dim_ipl,-4:5,-4:5,3),stat=alloc_status)
    if (alloc_status /= 0) then
       ierr = ierr+1
       if (ierr < dim_err) error_msg(ierr) = 141
    end if
    mat3 = 0.d0
-   
+
    !2017/05/22
    allocate(vp_compo(np_max),stat=alloc_status)
    if (alloc_status /= 0) then
@@ -3688,7 +3687,7 @@ subroutine eos_interpol_d3(m,q,ipl,inmp,ibeta,dim_ipl, eosthermo_out)
 
  ! initialisation of mat2
  mat2 = 0.d0
- 
+
  ! interpolation for three dimensional table
  ! standard choice: two-dimensional interpolation in ik(1) and ik(2)
  !                  one-dimensional interpolation in ik(3)

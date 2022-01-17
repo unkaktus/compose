@@ -2,22 +2,22 @@
 !   Copyright (c) 2013-2022 Stefan Typel, Marco Mancini, Micaela Oertel
 !
 !   This file is part of CompOSE
- !
- !   CompOSE is free software; you can redistribute it and/or modify
- !   it under the terms of the GNU General Public License as published by
- !   the Free Software Foundation; either version 2 of the License, or
- !   (at your option) any later version.
- !
- !   CompOSE is distributed in the hope that it will be useful,
- !   but WITHOUT ANY WARRANTY; without even the implied warranty of
- !   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- !   GNU General Public License for more details.
- !
- !   You should have received a copy of the GNU General Public License
- !   along with CompOSE; if not, write to the Free Software
- !   Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
- !
- !
+!
+!   CompOSE is free software; you can redistribute it and/or modify
+!   it under the terms of the GNU General Public License as published by
+!   the Free Software Foundation; either version 2 of the License, or
+!   (at your option) any later version.
+!
+!   CompOSE is distributed in the hope that it will be useful,
+!   but WITHOUT ANY WARRANTY; without even the implied warranty of
+!   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+!   GNU General Public License for more details.
+!
+!   You should have received a copy of the GNU General Public License
+!   along with CompOSE; if not, write to the Free Software
+!   Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+!
+!
 
 ! Example routine to read the hdf5 file and output opacity
 ! for a given point in T,n_B, Y_e of the EoS grid
@@ -25,19 +25,19 @@
 ! from the Compose files eos.t, eos.nb and eos.yq.
 ! Thus make sure that they are consistent with the underlying EoS of the
 ! opacity data table
- 
+
  subroutine read_opacity_hdf5
 
 
    use hdf5
    use modhdf5
-   
+
    implicit none
 
    integer,parameter :: dp = selected_real_kind(15)
-   
+
    character(len=500) :: file_read
-   
+
    integer itmin,itmax,itmax_kappa,jbmin,jbmax,jbmax_kappa,kymin,kymax,kymax_kappa
    integer npts,ndmax,jd,k,pt,it,jb,ky
    integer, allocatable :: nd(:,:,:)
@@ -50,7 +50,7 @@
    logical :: it_exist
 
    real(dp) :: kappa_nu,kappa_nubar,alpha,beta,enu
-   
+
    ! reading T,nb,Ye from Eos data files
 
    open(20,file='eos.t', status='old')
@@ -82,7 +82,7 @@
       read(20,*) tab_ye(ky)
    end do
    close(20)
-   
+
    write(*,*) 'File name for reading opacity data?'
    read(*,*) file_read
    write(*,*) 'Index for temperature?'
@@ -92,7 +92,7 @@
    write(*,*) 'Index for ye?'
    read(*,*) ky
 
-   write(*,*) 
+   write(*,*)
 
    inquire(file=file_read,exist=it_exist)
    if(.not. it_exist) then
@@ -105,7 +105,7 @@
    call hdf5_open_file(file_read,h5file_read,'r')
 
    ! First for neutrinos
-   
+
    write(*,*) '**************************************'
    write(*,*) '***           Neutrinos            ***'
    write(*,*) '**************************************'
@@ -167,13 +167,13 @@
    n4d(1) = ndmax
    n5d(2:5) = n4d(1:4)
    n5d(1) = npts
-   
+
    call hdf5_read_data(h5id,'enumax',n4d,enumax)
    call hdf5_read_data(h5id,'enumin',n4d,enumin)
    call hdf5_read_data(h5id,'nd_tny',n3d,nd)
    call hdf5_read_data(h5id,'coeffs',n5d,coeffs)
 
-   
+
    call hdf5_close_group(h5id)
 
 
@@ -192,7 +192,7 @@
    IF(pt.ne.0) then
       alpha = (enumax(pt,it,jb,ky)-enumin(pt,it,jb,ky))/2
       beta = (enumax(pt,it,jb,ky)+enumin(pt,it,jb,ky))/2
-      
+
       kappa_nu = coeffs(1,pt,it,jb,ky)
       DO k = 2,npts
          kappa_nu = kappa_nu + coeffs(k,pt,it,jb,ky)*((log(enu)-beta)/alpha)**(k-1)
@@ -214,7 +214,7 @@
    write(*,*) '**************************************'
    write(*,*) '***         Anti-neutrinos         ***'
    write(*,*) '**************************************'
-   
+
    ! read dimensions of table arrays
    call hdf5_open_group(h5file_read,'nu_bar',h5id)
    call hdf5_read_attr(h5id,'npts',npts)
@@ -263,7 +263,7 @@
    if(allocated(tab_temp)) deallocate(tab_temp)
    if(allocated(tab_nb)) deallocate(tab_nb)
    if(allocated(tab_ye)) deallocate(tab_ye)
-   
+
 
    allocate(nd(itmax,jbmax,kymax))
    allocate(enumin(ndmax,itmax,jbmax,kymax))
@@ -278,13 +278,13 @@
    n5d(2:5) = n4d(1:4)
    n5d(1) = npts
 
-   
+
    call hdf5_read_data(h5id,'enumax',n4d,enumax)
    call hdf5_read_data(h5id,'enumin',n4d,enumin)
    call hdf5_read_data(h5id,'nd_tny',n3d,nd)
    call hdf5_read_data(h5id,'coeffs',n5d,coeffs)
 
-   
+
    call hdf5_close_group(h5id)
 
 
@@ -304,7 +304,7 @@
    IF(pt.ne.0) then
       alpha = (enumax(pt,it,jb,ky)-enumin(pt,it,jb,ky))/2
       beta = (enumax(pt,it,jb,ky)+enumin(pt,it,jb,ky))/2
-      
+
       kappa_nubar = coeffs(1,pt,it,jb,ky)
       DO k = 2,npts
          kappa_nubar = kappa_nubar + coeffs(k,pt,it,jb,ky)*((log(enu)-beta)/alpha)**(k-1)
@@ -319,9 +319,9 @@
    if(allocated(enumin)) deallocate(enumin)
    if(allocated(enumax)) deallocate(enumax)
    if(allocated(coeffs)) deallocate(coeffs)
-      
+
    call hdf5_close_file(h5file_read)
-   
+
  end subroutine read_opacity_hdf5
 
 
