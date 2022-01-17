@@ -1724,7 +1724,7 @@ if (ierror == 0) then
 
             read(iunit,*)
             read(iunit,*) n_err
-            if ((n_err < 0).or.(n_err > 6)) then
+            if ((n_err < 0).or.(n_err > 8)) then
                ierr = ierr+1
                if (ierr < dim_err) error_msg(ierr) = 68
             end if
@@ -2319,7 +2319,7 @@ subroutine get_eos_table(iwr)
      if (idx_qty(i1) == 10)&
        write(*,*) i2,' derivative dp/dn_b|E                               [MeV]        '
      if (idx_qty(i1) == 11)&
-       write(*,*) i2,' derivative p/dE|n_b                                [fm^-3]      '
+       write(*,*) i2,' derivative dp/dE|n_b                                [fm^-3]      '
      if (idx_qty(i1) == 12)&
        write(*,*) i2,' square of speed of sound (c_s)^2                   []           '
      if (idx_qty(i1) == 13)&
