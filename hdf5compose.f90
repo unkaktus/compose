@@ -1,5 +1,26 @@
+!
+!   Copyright (c) 2013-2022 Stefan Typel, Marco Mancini, Micaela Oertel
+!
+!   This file is part of CompOSE
+!
+!   CompOSE is free software; you can redistribute it and/or modify
+!   it under the terms of the GNU General Public License as published by
+!   the Free Software Foundation; either version 2 of the License, or
+!   (at your option) any later version.
+!
+!   CompOSE is distributed in the hope that it will be useful,
+!   but WITHOUT ANY WARRANTY; without even the implied warranty of
+!   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+!   GNU General Public License for more details.
+!
+!   You should have received a copy of the GNU General Public License
+!   along with CompOSE; if not, write to the Free Software
+!   Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+!
+
+
 MODULE precision
-      
+
   integer,parameter :: dp = selected_real_kind(15)
 
 END MODULE precision
@@ -19,16 +40,16 @@ MODULE hdfparameters
   integer,allocatable :: index_thermo(:),index_thermo_add(:),index_err(:),index_deriv(:)
   integer, allocatable :: index_yi(:),index_av(:),index_micro(:)
 
-contains 
+contains
 
   subroutine initialise_hdf5(n_nb,n_t,n_yq)
 
     use general_var, only : tabulation_schema
-    USE compose_internal 
+    USE compose_internal
     IMPLICIT NONE
-    
+
     integer n_nb,n_t,n_yq
-    
+
     m_nb = n_nb
     n_temp = n_t
     o_y_q = n_yq
@@ -102,7 +123,7 @@ contains
        err_hdf5 = 0._dp
        index_err = 0
     else
-       write(*,*) 'n_m equal to zero, no error quantities'
+       write(*,*) 'n_err equal to zero, no error quantities'
     end if
 
 
@@ -128,11 +149,11 @@ contains
     use modhdf5
 
     IMPLICIT NONE
-    
+
     integer n4d(4)
     integer(hid_t) ::  h5id, h5file_write
     character(LEN=15) :: file_write = 'eoscompose.h5'
-    
+
     call hdf5_init()
     call hdf5_create_file(file_write,h5file_write)
 
@@ -141,7 +162,7 @@ contains
     call hdf5_write_attr(h5id,'tabulation_scheme',tabulation_schema)
     call hdf5_write_attr(h5id,'pointst',n_temp)
     call hdf5_write_attr(h5id,'pointsyq',o_y_q)
-       
+
     call hdf5_write_data(h5id,'nb',m_nb,nb_hdf5)
     if(tabulation_schema.eq.0) then
        call hdf5_write_data(h5id,'t',m_nb,t_hdf5)
@@ -165,7 +186,7 @@ contains
        call hdf5_write_data(h5id,'index_thermo',n_qty,index_thermo)
        call hdf5_close_group(h5id)
     end if
-    
+
     write(*,*) 'writing ',n_add,' additional thermodynamic quantities into file'
     if(n_add.ne.0) then
        call hdf5_create_group(h5file_write,'Thermo_add', h5id)
@@ -271,5 +292,3 @@ contains
   end subroutine close_hdf5
 
 end MODULE hdfparameters
-
-

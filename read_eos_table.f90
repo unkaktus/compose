@@ -1,13 +1,34 @@
+!
+!   Copyright (c) 2013-2022 Stefan Typel, Marco Mancini, Micaela Oertel
+!
+!   This file is part of CompOSE
+!
+!   CompOSE is free software; you can redistribute it and/or modify
+!   it under the terms of the GNU General Public License as published by
+!   the Free Software Foundation; either version 2 of the License, or
+!   (at your option) any later version.
+!
+!   CompOSE is distributed in the hope that it will be useful,
+!   but WITHOUT ANY WARRANTY; without even the implied warranty of
+!   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+!   GNU General Public License for more details.
+!
+!   You should have received a copy of the GNU General Public License
+!   along with CompOSE; if not, write to the Free Software
+!   Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+!
+
+
 ! Sample routine for reading the EoS data from a Compose generated table in
 ! Hdf5 format
-  
+
 subroutine read_hdf5
 
   use hdf5
   use modhdf5
   use precision
   IMPLICIT NONE
-  
+
 
   real(dp), allocatable :: nb_hdf5(:),t_hdf5(:),y_q_hdf5(:)
   real(dp), allocatable :: thermo_hdf5(:,:,:,:), thermo_hdf5_add(:,:,:,:)
@@ -18,12 +39,12 @@ subroutine read_hdf5
   integer, allocatable :: index_yi(:),index_av(:),index_micro(:)
 
   integer itab
-    
+
   integer m_nb,n_temp,o_y_q,n_qty,n_add,n_p,n_q,n_m,n_err,i,j,k
   integer :: n4d(4)
 
   character(len=500) :: file_read
-  
+
   integer(hid_t) ::  h5id, h5file_read
   character(LEN=1),parameter :: as = '"'
   logical :: it_exist,group_exist
@@ -34,20 +55,20 @@ subroutine read_hdf5
 
   write(*,*) 'File name for reading data?'
   read(*,*) file_read
-  
+
 
   inquire(file=file_read,exist=it_exist)
   if(.not. it_exist) then
      print '(3a)', "Error : the file '",trim(file_read),"' does not exist"
      return
   endif
-    
+
   call hdf5_init()
 
   call hdf5_open_file(file_read,h5file_read,'r')
 
   ! reading thermo parameters and array dimensions
-    
+
   call hdf5_open_group(h5file_read,'Parameters', h5id)
   call hdf5_read_attr(h5id,'pointsnb',m_nb)
   call hdf5_read_attr(h5id,'tabulation_scheme',itab)
@@ -73,7 +94,7 @@ subroutine read_hdf5
   n4d(2) = n_temp
   n4d(3) = o_y_q
 ! read thermo quantities
-  
+
   call hdf5_query_group(h5file_read, 'Thermo_qty', group_exist)
   if(.not. group_exist) then
      n_qty = 0
@@ -93,7 +114,7 @@ subroutine read_hdf5
   end if
 
 ! read additional thermo quantities
-  
+
   call hdf5_query_group(h5file_read, 'Thermo_add', group_exist)
   if(.not. group_exist) then
      n_add = 0
@@ -120,7 +141,7 @@ subroutine read_hdf5
      n_p = 0
      write(*,*) 'No pairs in file'
   else
-     
+
      call hdf5_open_group(h5file_read,'Composition_pairs', h5id)
      call hdf5_read_attr(h5id,'pointspairs',n_p)
      n4d(4) = n_p
@@ -151,7 +172,7 @@ subroutine read_hdf5
      allocate(aav_hdf5(m_nb,n_temp,o_y_q,n_q))
      allocate(nav_hdf5(m_nb,n_temp,o_y_q,n_q))
      allocate(index_av(n_q))
-     
+
      call hdf5_read_data(h5id,'yav',n4d,yav_hdf5)
      call hdf5_read_data(h5id,'aav',n4d,aav_hdf5)
      call hdf5_read_data(h5id,'zav',n4d,zav_hdf5)
@@ -191,7 +212,7 @@ subroutine read_hdf5
      n_err = 0
      write(*,*) 'No error information in file'
   else
-     
+
      call hdf5_open_group(h5file_read,'Error_qty', h5id)
      call hdf5_read_attr(h5id,'pointserr',n_err)
      n4d(4) = n_err
@@ -242,7 +263,7 @@ subroutine read_hdf5
   IF(allocated(t_hdf5)) deallocate(t_hdf5)
   IF(allocated(y_q_hdf5)) deallocate(y_q_hdf5)
 
-  
+
 end subroutine read_hdf5
 
 

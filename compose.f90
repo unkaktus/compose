@@ -1,3 +1,24 @@
+!
+!   Copyright (c) 2013-2022 Stefan Typel, Marco Mancini, Micaela Oertel
+!
+!   This file is part of CompOSE
+!
+!   CompOSE is free software; you can redistribute it and/or modify
+!   it under the terms of the GNU General Public License as published by
+!   the Free Software Foundation; either version 2 of the License, or
+!   (at your option) any later version.
+!
+!   CompOSE is distributed in the hope that it will be useful,
+!   but WITHOUT ANY WARRANTY; without even the implied warranty of
+!   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+!   GNU General Public License for more details.
+!
+!   You should have received a copy of the GNU General Public License
+!   along with CompOSE; if not, write to the Free Software
+!   Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+!
+
+
 !***********************************************************************
 !***********************************************************************
 ! Fortran90 program from the CompOSE website http://compose.obspm.fr
@@ -1219,7 +1240,7 @@ subroutine get_eos_report(iwr)
               end if
               count_lorene = 0
               minimum_enthalpy = 0.d0
-              
+
               do in=1,dim_idx(ip),1
                  nb = tab_para(in,ip)
                  !++++++++++++++++++++++++++++++
@@ -1724,7 +1745,7 @@ if (ierror == 0) then
 
             read(iunit,*)
             read(iunit,*) n_err
-            if ((n_err < 0).or.(n_err > 6)) then
+            if ((n_err < 0).or.(n_err > 8)) then
                ierr = ierr+1
                if (ierr < dim_err) error_msg(ierr) = 68
             end if
@@ -2319,7 +2340,7 @@ subroutine get_eos_table(iwr)
      if (idx_qty(i1) == 10)&
        write(*,*) i2,' derivative dp/dn_b|E                               [MeV]        '
      if (idx_qty(i1) == 11)&
-       write(*,*) i2,' derivative p/dE|n_b                                [fm^-3]      '
+       write(*,*) i2,' derivative dp/dE|n_b                                [fm^-3]      '
      if (idx_qty(i1) == 12)&
        write(*,*) i2,' square of speed of sound (c_s)^2                   []           '
      if (idx_qty(i1) == 13)&
@@ -2633,7 +2654,7 @@ subroutine get_eos_beta(y,ipl,ierr,i_entr, eos_thermo)
        call get_eos_sub_new(ipl,ierr,0,1,i_entr,eos_thermo)
        !++++++++++++++++++++++++++++++++++++
     end if
-    
+
    return
  else
 
@@ -3632,14 +3653,14 @@ subroutine eos_interpol_d3(m,q,ipl,inmp,ibeta,dim_ipl, eosthermo_out)
      if (ierr < dim_err) error_msg(ierr) = 140
    end if
    mat = 0.d0
-   
+
    allocate(mat3(dim_ipl,-4:5,-4:5,3),stat=alloc_status)
    if (alloc_status /= 0) then
       ierr = ierr+1
       if (ierr < dim_err) error_msg(ierr) = 141
    end if
    mat3 = 0.d0
-   
+
    !2017/05/22
    allocate(vp_compo(np_max),stat=alloc_status)
    if (alloc_status /= 0) then
@@ -3666,7 +3687,7 @@ subroutine eos_interpol_d3(m,q,ipl,inmp,ibeta,dim_ipl, eosthermo_out)
 
  ! initialisation of mat2
  mat2 = 0.d0
- 
+
  ! interpolation for three dimensional table
  ! standard choice: two-dimensional interpolation in ik(1) and ik(2)
  !                  one-dimensional interpolation in ik(3)

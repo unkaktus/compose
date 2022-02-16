@@ -54,10 +54,15 @@ present release of the **CompOSE** tools contains the following files
 mainly by C. Ishizuka, T. Klaehn, M. Marcini, M. Oertel, and S. Typel (contact develop@compose.obspm.fr).
 
 
-INSTALL :
+### INSTALL :
 
-in the normal case type "make" or "make compose"
+I the standard case type "make" or "make compose"
 
-If you want to build the version running on the WEB APP, type "make compose_for_web"
+## Installation with HDF5
+if you want install Compose without HDF5 !
 
-this is a try
+In a terminal :
+```bash
+export USE_HDF5 = 0
+make
+```
