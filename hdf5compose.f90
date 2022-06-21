@@ -42,13 +42,13 @@ MODULE hdfparameters
 
 contains
 
-  subroutine initialise_hdf5(n_nb,n_t,n_yq)
+  subroutine initialise_hdf5(n_nb,n_t,n_yq,i_beta,i_entr)
 
     use general_var, only : tabulation_schema
     USE compose_internal
     IMPLICIT NONE
 
-    integer n_nb,n_t,n_yq
+    integer n_nb,n_t,n_yq,i_beta,i_entr
 
     m_nb = n_nb
     n_temp = n_t
@@ -133,15 +133,24 @@ contains
        allocate(y_q_hdf5(m_nb))
     else
        allocate(nb_hdf5(m_nb))
-       allocate(t_hdf5(n_temp))
-       allocate(y_q_hdf5(o_y_q))
+       if(i_entr == 0) then
+          allocate(t_hdf5(n_temp))
+       else
+          allocate(t_hdf5(m_nb*n_temp))
+          ! if we fix entropy per baryon, T is given
+       end if
+       if(i_beta==0) then
+          allocate(y_q_hdf5(o_y_q))
+       else
+          allocate(y_q_hdf5(m_nb)) ! for beta_equilibrim, Y_e is determined
+       end if
     end IF
     nb_hdf5 = 0._dp
     t_hdf5 = 0._dp
     y_q_hdf5 = 0._dp
   end subroutine initialise_hdf5
 
-  subroutine write_hdf5
+  subroutine write_hdf5(i_beta,i_entr)
 
     use general_var, only : tabulation_schema
     USE compose_internal
@@ -150,6 +159,8 @@ contains
 
     IMPLICIT NONE
 
+    integer :: i_beta,i_entr
+    
     integer n4d(4)
     integer(hid_t) ::  h5id, h5file_write
     character(LEN=15) :: file_write = 'eoscompose.h5'
@@ -160,16 +171,31 @@ contains
     call hdf5_create_group(h5file_write,'Parameters', h5id)
     call hdf5_write_attr(h5id,'pointsnb',m_nb)
     call hdf5_write_attr(h5id,'tabulation_scheme',tabulation_schema)
-    call hdf5_write_attr(h5id,'pointst',n_temp)
-    call hdf5_write_attr(h5id,'pointsyq',o_y_q)
-
+    if(i_entr == 0) then
+       call hdf5_write_attr(h5id,'pointst',n_temp)
+    else
+       call hdf5_write_attr(h5id,'pointst',n_temp*m_nb)
+    end if
+    if(i_beta == 0 ) then
+       call hdf5_write_attr(h5id,'pointsyq',o_y_q)
+    else
+       call hdf5_write_attr(h5id,'pointsyq',m_nb)
+    end if
     call hdf5_write_data(h5id,'nb',m_nb,nb_hdf5)
     if(tabulation_schema.eq.0) then
        call hdf5_write_data(h5id,'t',m_nb,t_hdf5)
        call hdf5_write_data(h5id,'yq',m_nb,y_q_hdf5)
     else
-       call hdf5_write_data(h5id,'t',n_temp,t_hdf5)
-       call hdf5_write_data(h5id,'yq',o_y_q,y_q_hdf5)
+       if(i_entr == 0 ) then
+          call hdf5_write_data(h5id,'t',n_temp,t_hdf5)
+       else
+          call hdf5_write_data(h5id,'t',n_temp*m_nb,t_hdf5)
+       end if
+       if(i_beta == 0) then
+          call hdf5_write_data(h5id,'yq',o_y_q,y_q_hdf5)
+       else
+          call hdf5_write_data(h5id,'yq',m_nb,y_q_hdf5)
+       end if
     end if
     call hdf5_close_group(h5id)
     n4d(1) = m_nb

@@ -1216,6 +1216,7 @@ subroutine get_eos_report(iwr)
                  !++++++++++++++++++++++++++++++
                  if (yq > 0.d00) then
                     enthalpy = eos_thermo(7) + 1.d0 + eos_thermo(1)/(m_n*nb)
+                    write(*,*) 'first: nb and enthalpy', nb, enthalpy,count_lorene,yq
                     if(first_in) then
                        if((minimum_enthalpy.ne.10.d0).and.(enthalpy.ge.minimum_enthalpy)) then
                           in_lorene = in - 1
@@ -1226,6 +1227,7 @@ subroutine get_eos_report(iwr)
 
                     else
                        if(enthalpy.gt.minimum_enthalpy) then
+                          write(*,*) 'nb and enthalpy', nb, enthalpy,count_lorene,yq
                           count_lorene = count_lorene + 1
                           minimum_enthalpy = enthalpy
                        end if
@@ -2042,9 +2044,9 @@ subroutine get_eos_table(iwr)
        ! HDF5
 #if defined have_hdf5
        IF(tabulation_schema == 0) then
-         call initialise_hdf5(pts%tnyb,1,1)
-       else
-         call initialise_hdf5(pts%nb,pts%t,pts%yq)
+         call initialise_hdf5(pts%tnyb,1,1,i_beta,i_entr)
+      else
+         call initialise_hdf5(pts%nb,pts%t,pts%yq,i_beta,i_entr)
        end IF
 #endif
      end if
@@ -2226,27 +2228,35 @@ subroutine get_eos_table(iwr)
                        else
                          ! HDF5
 #if defined have_hdf5
-                         !2017/05/23
-                         t_hdf5(j_t) = arg2(1)
-                         nb_hdf5(j_nb) = arg2(2)
-                         y_q_hdf5(j_yq) = arg2(3)
-                         IF(n_qty.ne.0) then
-                           thermo_hdf5(j_nb,j_t,j_yq,1:n_qty) = eos_thermo(idx_qty(1:n_qty))
-                           index_thermo(1:n_qty) = idx_qty(1:n_qty)
-                         end IF
-                         IF(n_add.ne.0) then
-                           thermo_hdf5_add(j_nb,j_t,j_yq,1:n_add) = eos_thermo_add(1:n_add)
-                           index_thermo_add(1:n_add) = idx_add(1:n_add)
-                         end IF
-                         if(n_df.ne.0) then
-                            deriv_hdf5(j_nb,j_t,j_yq,1:n_df) = eos_df(idx_df(1:n_df))
-                            index_deriv(1:n_df) = idx_df(1:n_df)
-                         end if
-                         IF(n_p.ne.0) then
-                           yi_hdf5(j_nb,j_t,j_yq,1:n_p) = eos_compo_p(1:n_p)
+                          !2017/05/23
+                          if(i_entr ==0) then
+                             t_hdf5(j_t) = arg2(1)
+                          else
+                             t_hdf5(j_nb + (j_t-1)*pts%nb) = arg2(1)
+                          end if
+                          nb_hdf5(j_nb) = arg2(2)
+                          if(i_beta ==0) then
+                             y_q_hdf5(j_yq) = arg2(3)
+                          else
+                             y_q_hdf5(j_nb) = arg2(3)
+                          end if
+                          IF(n_qty.ne.0) then
+                             thermo_hdf5(j_nb,j_t,j_yq,1:n_qty) = eos_thermo(idx_qty(1:n_qty))
+                             index_thermo(1:n_qty) = idx_qty(1:n_qty)
+                          end IF
+                          IF(n_add.ne.0) then
+                             thermo_hdf5_add(j_nb,j_t,j_yq,1:n_add) = eos_thermo_add(1:n_add)
+                             index_thermo_add(1:n_add) = idx_add(1:n_add)
+                          end IF
+                          if(n_df.ne.0) then
+                             deriv_hdf5(j_nb,j_t,j_yq,1:n_df) = eos_df(idx_df(1:n_df))
+                             index_deriv(1:n_df) = idx_df(1:n_df)
+                          end if
+                          IF(n_p.ne.0) then
+                             yi_hdf5(j_nb,j_t,j_yq,1:n_p) = eos_compo_p(1:n_p)
                            index_yi(1:n_p) = idx_p(1:n_p)
-                         end IF
-                         IF(n_q.ne.0) then
+                        end IF
+                        IF(n_q.ne.0) then
                            !2017/10/09 ->
                            yav_hdf5(j_nb,j_t,j_yq,1:n_q) = eos_compo_q(1:n_q,1)
                            aav_hdf5(j_nb,j_t,j_yq,1:n_q) = eos_compo_q(1:n_q,2)
@@ -2286,7 +2296,7 @@ subroutine get_eos_table(iwr)
      ! HDF5
 #if defined have_hdf5
      write(*,*)'call writing HDF5 table'
-     call write_hdf5()
+     call write_hdf5(i_beta,i_entr)
      call close_hdf5
 #endif
    end if
