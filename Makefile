@@ -29,10 +29,10 @@ EXEC_TEST_KAPPA = $(NAME_READ_KAPPA)
 
 
 # attention, the test codes need HDF5
-# We introduce the initialisation by twot environment variables :
+# We introduce the initialisation by two environment variables :
 # USE_BOUNDCHECK USE_HDF5
-# Now we test if the environment variables was void. In this cas we
-# use the default flags settings (HDF5 = 1, BOUNDCHECK = 1)
+# Now we test if the environment variables was void. In this case we
+# use the default flag settings (HDF5 = 1, BOUNDCHECK = 1)
 ifndef USE_BOUNDCHECK
   BOUNDCHECK = 1 #default
 else
@@ -44,7 +44,7 @@ else
   HDF5 = $(USE_HDF5)
 endif
 
-# set here your chois if you want set a value
+# set here your choice if you want set a value
 # BOUNDCHECK = 1
 # HDF5 = 1
 

@@ -268,7 +268,7 @@ contains
        call hdf5_write_attr(h5id,'pointsmicro',n_m)
        n4d(4) = n_m
        call hdf5_write_data(h5id,'micro',n4d,micro_hdf5)
-       call hdf5_write_data(h5id,'index_micro',n_q,index_micro)
+       call hdf5_write_data(h5id,'index_micro',n_m,index_micro)
        call hdf5_close_group(h5id)
     end if
 
